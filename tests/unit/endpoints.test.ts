@@ -24,33 +24,25 @@ describe('EndpointBuilder', () => {
 
   describe('getBaseUrl', () => {
     it('should return correct base URL', () => {
-      expect(builder.getBaseUrl()).toBe(
-        'https://fms.example.com/fmi/odata/v4/TestDB'
-      );
+      expect(builder.getBaseUrl()).toBe('https://fms.example.com/fmi/odata/v4/TestDB');
     });
   });
 
   describe('metadata', () => {
     it('should return metadata URL', () => {
-      expect(builder.metadata()).toBe(
-        'https://fms.example.com/fmi/odata/v4/TestDB/$metadata'
-      );
+      expect(builder.metadata()).toBe('https://fms.example.com/fmi/odata/v4/TestDB/$metadata');
     });
   });
 
   describe('tables', () => {
     it('should return tables list URL', () => {
-      expect(builder.tables()).toBe(
-        'https://fms.example.com/fmi/odata/v4/TestDB'
-      );
+      expect(builder.tables()).toBe('https://fms.example.com/fmi/odata/v4/TestDB');
     });
   });
 
   describe('table', () => {
     it('should return table URL', () => {
-      expect(builder.table('Users')).toBe(
-        'https://fms.example.com/fmi/odata/v4/TestDB/Users'
-      );
+      expect(builder.table('Users')).toBe('https://fms.example.com/fmi/odata/v4/TestDB/Users');
     });
   });
 

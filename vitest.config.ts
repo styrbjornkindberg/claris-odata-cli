@@ -35,13 +35,7 @@ export default defineConfig({
       include: ['src/**/*.ts'],
 
       // Exclude test files from coverage
-      exclude: [
-        'node_modules/**',
-        'tests/**',
-        'dist/**',
-        '**/*.d.ts',
-        '**/*.types.ts',
-      ],
+      exclude: ['node_modules/**', 'tests/**', 'dist/**', '**/*.d.ts', '**/*.types.ts'],
     },
 
     // Test file patterns
