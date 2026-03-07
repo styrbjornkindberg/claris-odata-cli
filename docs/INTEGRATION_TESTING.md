@@ -36,7 +36,7 @@ Tests are **self-constructing**:
    - Update records
    - Delete records
 
-3. **Cleanup phase**: Deletes test database (if `TEST_CLEANUP=true`)
+3. **Cleanup phase**: Truncates tables (leaves database intact for reuse)
 
 ## CI/CD Integration
 
@@ -89,8 +89,9 @@ Tests will create these tables:
 - Contact your FileMaker Server administrator
 
 ### "Database already exists"
-- Set `TEST_CLEANUP=true` to clean up after tests
-- Manually delete the test database via FileMaker Pro
+- This is fine! Database is reused across test runs
+- Tables are truncated before each test run
+- No manual cleanup needed
 
 ## Running Tests Locally
 
