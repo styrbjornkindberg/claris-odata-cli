@@ -106,11 +106,7 @@ export class Logger {
    * @param message - Message to log
    * @param data - Additional data
    */
-  private log(
-    level: LogLevel,
-    message: string,
-    data?: Record<string, unknown>
-  ): void {
+  private log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
     // Check if level is enabled
     if (LOG_LEVELS[level] < LOG_LEVELS[this.config.level]) {
       return;

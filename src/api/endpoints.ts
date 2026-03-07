@@ -95,9 +95,7 @@ export class EndpointBuilder {
    * @returns Script URL
    */
   script(tableName: string, scriptName: string, recordId?: number): string {
-    const base = recordId
-      ? this.record(tableName, recordId)
-      : this.table(tableName);
+    const base = recordId ? this.record(tableName, recordId) : this.table(tableName);
     return `${base}/Script(${encodeURIComponent(scriptName)})`;
   }
 
@@ -109,11 +107,7 @@ export class EndpointBuilder {
    * @param fieldName - Container field name
    * @returns Container upload URL
    */
-  container(
-    tableName: string,
-    recordId: number,
-    fieldName: string
-  ): string {
+  container(tableName: string, recordId: number, fieldName: string): string {
     return `${this.getBaseUrl()}/${tableName}(${recordId})/${fieldName}`;
   }
 }

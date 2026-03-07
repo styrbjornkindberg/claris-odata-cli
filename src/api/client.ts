@@ -7,7 +7,7 @@
  * @see https://help.claris.com/en/odata-guide/
  */
 
-import type { AxiosInstance, AxiosRequestConfig } from 'axios';
+import type { AxiosInstance } from 'axios';
 import axios from 'axios';
 import { ODataError } from './errors';
 import type { QueryOptions } from '../types';
@@ -112,21 +112,13 @@ export class ODataClient {
    */
   private handleApiError(error: unknown): never {
     if (axios.isAxiosError(error) && error.response) {
-      const odataError = error.response.data?.error as ODataError | undefined;
+      const odataError = error.response.data?.error as { message?: string } | undefined;
       const message = odataError?.message ?? error.message;
-      const code = odataError?.code ?? String(error.response.status);
 
-      throw new ODataError(
-        message,
-        error.response.status,
-        error.response.data
-      );
+      throw new ODataError(message, error.response.status, error.response.data);
     }
 
-    throw new ODataError(
-      error instanceof Error ? error.message : 'Unknown error',
-      500
-    );
+    throw new ODataError(error instanceof Error ? error.message : 'Unknown error', 500);
   }
 
   /**
@@ -136,10 +128,7 @@ export class ODataClient {
    * @param options - Query options
    * @returns Array of records
    */
-  async getRecords<T = unknown>(
-    tableName: string,
-    options?: QueryOptions
-  ): Promise<T[]> {
+  async getRecords<T = unknown>(tableName: string, options?: QueryOptions): Promise<T[]> {
     const query = this.buildQueryString(options);
     const url = `/fmi/odata/v4/${this.database}/${tableName}${query}`;
 
@@ -154,10 +143,7 @@ export class ODataClient {
    * @param recordId - Record ID
    * @returns Single record
    */
-  async getRecord<T = unknown>(
-    tableName: string,
-    recordId: number
-  ): Promise<T> {
+  async getRecord<T = unknown>(tableName: string, recordId: number): Promise<T> {
     const url = `/fmi/odata/v4/${this.database}/${tableName}(${recordId})`;
     const response = await this.http.get<T>(url);
     return response.data;
@@ -170,10 +156,7 @@ export class ODataClient {
    * @param data - Record data
    * @returns Created record
    */
-  async createRecord<T = unknown>(
-    tableName: string,
-    data: Record<string, unknown>
-  ): Promise<T> {
+  async createRecord<T = unknown>(tableName: string, data: Record<string, unknown>): Promise<T> {
     const url = `/fmi/odata/v4/${this.database}/${tableName}`;
     const response = await this.http.post<T>(url, data);
     return response.data;
