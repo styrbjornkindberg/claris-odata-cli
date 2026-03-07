@@ -8,14 +8,20 @@
 
 ## Setup Steps
 
-1. **Copy environment template**
+1. **Create test database in FileMaker**
+   - Open FileMaker Pro or Admin Console
+   - Create a new database for testing (e.g., `test_claris_odata_cli`)
+   - Enable OData access for this database
+
+2. **Copy environment template**
    ```bash
    cp tests/integration/.env.example tests/integration/.env
    ```
 
-2. **Configure credentials**
+3. **Configure credentials**
    - Open `.env` and fill in your FileMaker server details
-   - `FM_USERNAME` and `FM_PASSWORD` must have schema modification permissions
+   - `FM_DATABASE` must be an existing database
+   - `FM_USERNAME` and `FM_PASSWORD` must have table creation permissions
 
 3. **Run integration tests**
    ```bash
@@ -26,17 +32,21 @@
 
 Tests are **self-constructing**:
 
-1. **Setup phase**: Creates test database and tables
-   - Database: `test_claris_odata_cli` (or custom name in `.env`)
-   - Tables: Customers, Orders, Products (configurable)
+1. **Prerequisite**: Database must already exist (OData cannot create databases)
+   - You provide: `test_claris_odata_cli` or any existing database
+   - Tests will create/drop tables within it
 
-2. **Test phase**: Runs CRUD operations against the constructed database
+2. **Setup phase**: Creates test tables
+   - Tables: `test_customers`, `test_orders`, `test_products` (prefixed to avoid conflicts)
+   - Fields: id, name, email, etc.
+
+3. **Test phase**: Runs CRUD operations against the constructed tables
    - Create records
    - Read records (single and list)
    - Update records
    - Delete records
 
-3. **Cleanup phase**: Truncates tables (leaves database intact for reuse)
+4. **Cleanup phase**: Drops test tables (leaves database intact)
 
 ## CI/CD Integration
 
