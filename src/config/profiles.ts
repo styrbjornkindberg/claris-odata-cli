@@ -6,7 +6,7 @@
  * @module config/profiles
  */
 
-import type { Profile, OutputFormat } from '../types';
+import type { Profile } from '../types';
 
 /**
  * Default profile name
@@ -113,10 +113,7 @@ export class ProfileManager {
    * @param config - Profile configuration
    * @returns The profile
    */
-  setProfile(
-    name: string,
-    config?: Partial<Omit<Profile, 'name'>>
-  ): Profile {
+  setProfile(name: string, config?: Partial<Omit<Profile, 'name'>>): Profile {
     const profile: Profile = {
       name,
       outputFormat: config?.outputFormat ?? 'table',

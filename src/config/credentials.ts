@@ -7,7 +7,6 @@
  */
 
 import keytar from 'keytar';
-import type { Credentials } from '../types';
 
 /**
  * Service name for keychain storage
@@ -63,11 +62,7 @@ export class CredentialsManager {
    * @param username - Username
    * @returns Whether credentials were deleted
    */
-  async deleteCredentials(
-    serverId: string,
-    database: string,
-    username: string
-  ): Promise<boolean> {
+  async deleteCredentials(serverId: string, database: string, username: string): Promise<boolean> {
     const account = this.buildAccountKey(serverId, database, username);
     return keytar.deletePassword(SERVICE_NAME, account);
   }
@@ -80,11 +75,7 @@ export class CredentialsManager {
    * @param username - Username
    * @returns Account key
    */
-  private buildAccountKey(
-    serverId: string,
-    database: string,
-    username: string
-  ): string {
+  private buildAccountKey(serverId: string, database: string, username: string): string {
     return `${serverId}:${database}:${username}`;
   }
 
@@ -96,11 +87,7 @@ export class CredentialsManager {
    * @param username - Username
    * @returns Whether credentials exist
    */
-  async hasCredentials(
-    serverId: string,
-    database: string,
-    username: string
-  ): Promise<boolean> {
+  async hasCredentials(serverId: string, database: string, username: string): Promise<boolean> {
     const credentials = await this.getCredentials(serverId, database, username);
     return credentials !== null;
   }

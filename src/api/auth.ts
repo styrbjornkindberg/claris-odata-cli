@@ -22,9 +22,7 @@ export class AuthManager {
    * @returns Basic Auth header value
    */
   createBasicAuthToken(username: string, password: string): string {
-    const credentials = Buffer.from(`${username}:${password}`).toString(
-      'base64'
-    );
+    const credentials = Buffer.from(`${username}:${password}`).toString('base64');
     return `Basic ${credentials}`;
   }
 

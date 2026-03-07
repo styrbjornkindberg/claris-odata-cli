@@ -7,7 +7,7 @@
  */
 
 import { BaseCommand, type CommandOptions } from './index';
-import type { CommandResult, QueryOptions } from '../types';
+import type { CommandResult } from '../types';
 
 /**
  * Get command options
@@ -45,19 +45,8 @@ export class GetCommand extends BaseCommand<GetOptions> {
    * @returns Command result with records
    */
   async execute(): Promise<CommandResult> {
-    // Build query options for future API implementation
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const _query: QueryOptions = {
-      filter: this.options.filter,
-      select: this.options.select,
-      top: this.options.top,
-      skip: this.options.skip,
-      orderby: this.options.orderby,
-      count: this.options.count,
-    };
-
-    // TODO: Implement actual API call using _query
-    // For now, return placeholder
+    // TODO: Implement actual API call
+    // Query options from this.options: filter, select, top, skip, orderby, count
     return {
       success: false,
       error: 'Get command not yet implemented',

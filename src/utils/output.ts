@@ -46,10 +46,7 @@ export class OutputFormatter {
    * @param columns - Column definitions for table format
    * @returns Formatted string
    */
-  formatData<T extends Record<string, unknown>>(
-    data: T | T[],
-    columns?: TableColumn[]
-  ): string {
+  formatData<T extends Record<string, unknown>>(data: T | T[], columns?: TableColumn[]): string {
     switch (this.format) {
       case 'json':
         return this.formatJson(data);
@@ -80,10 +77,7 @@ export class OutputFormatter {
    * @param columns - Column definitions
    * @returns CSV string
    */
-  private formatCsv<T extends Record<string, unknown>>(
-    data: T[],
-    columns?: TableColumn[]
-  ): string {
+  private formatCsv<T extends Record<string, unknown>>(data: T[], columns?: TableColumn[]): string {
     if (data.length === 0) {
       return '';
     }
@@ -133,14 +127,10 @@ export class OutputFormatter {
     const widths = this.calculateWidths(data, cols);
 
     // Create header row
-    const headerRow = cols
-      .map((col, i) => this.pad(col.header, widths[i] ?? 0))
-      .join('  ');
+    const headerRow = cols.map((col, i) => this.pad(col.header, widths[i] ?? 0)).join('  ');
 
     // Create separator
-    const separator = cols
-      .map((_, i) => '-'.repeat(widths[i] ?? 0))
-      .join('  ');
+    const separator = cols.map((_, i) => '-'.repeat(widths[i] ?? 0)).join('  ');
 
     // Create data rows
     const dataRows = data.map((item) =>
@@ -161,9 +151,7 @@ export class OutputFormatter {
    * @param data - Array of records
    * @returns Column definitions
    */
-  private inferColumns<T extends Record<string, unknown>>(
-    data: T[]
-  ): TableColumn[] {
+  private inferColumns<T extends Record<string, unknown>>(data: T[]): TableColumn[] {
     const keys = Object.keys(data[0] ?? {});
     return keys.map((key) => ({
       header: key.charAt(0).toUpperCase() + key.slice(1),
@@ -182,13 +170,9 @@ export class OutputFormatter {
     data: T[],
     columns: TableColumn[]
   ): number[] {
-    return columns.map((col, i) => {
+    return columns.map((col) => {
       const headerWidth = col.header.length;
-      const dataWidth = Math.max(
-        ...data.map((item) =>
-          this.formatValue(item[col.key]).length
-        )
-      );
+      const dataWidth = Math.max(...data.map((item) => this.formatValue(item[col.key]).length));
       // Use col.width if specified, otherwise use max of header and data
       return col.width ?? Math.max(headerWidth, dataWidth);
     });
