@@ -1,0 +1,203 @@
+/**
+ * Claris OData CLI - Main Entry Point
+ *
+ * Command-line interface for working with Claris FileMaker OData API.
+ *
+ * @module index
+ */
+
+import { Command } from 'commander';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { logger } from './utils/logger';
+import type { OutputFormat } from './types';
+
+// Load package.json for version
+const packageJsonPath = resolve(__dirname, '..', 'package.json');
+const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+
+/**
+ * Create and configure the CLI program
+ *
+ * @returns Configured Commander program
+ */
+function createProgram(): Command {
+  const program = new Command();
+
+  program
+    .name('fmo')
+    .description('CLI tool for working with Claris FileMaker OData API')
+    .version(packageJson.version)
+    .option('-v, --verbose', 'Enable verbose logging')
+    .option('-f, --format <format>', 'Output format (json, table, csv)', 'table')
+    .option('-s, --server <id>', 'Default server ID')
+    .option('-d, --database <name>', 'Default database name');
+
+  // List command
+  program
+    .command('list <resource>')
+    .description('List servers, databases, or tables')
+    .option('-s, --server <id>', 'Server ID (required for databases and tables)')
+    .action(async (resource: string, options) => {
+      const { ListCommand } = await import('./cli/list');
+      const globalOpts = program.opts();
+      const cmd = new ListCommand({
+        resource: resource as 'servers' | 'databases' | 'tables',
+        serverId: options.server ?? globalOpts.server,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Get command
+  program
+    .command('get <table>')
+    .description('Get records from a table')
+    .requiredOption('-s, --server <id>', 'Server ID')
+    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-f, --filter <expr>', 'OData filter expression')
+    .option('--select <fields>', 'Fields to select (comma-separated)')
+    .option('-t, --top <n>', 'Maximum records to return', parseInt)
+    .option('--skip <n>', 'Records to skip', parseInt)
+    .option('--orderby <field>', 'Order by field')
+    .option('--count', 'Include total count')
+    .action(async (table: string, options) => {
+      const { GetCommand } = await import('./cli/get');
+      const globalOpts = program.opts();
+      const select = options.select ? options.select.split(',') : undefined;
+      const cmd = new GetCommand({
+        table,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        filter: options.filter,
+        select,
+        top: options.top,
+        skip: options.skip,
+        orderby: options.orderby,
+        count: options.count,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Create command
+  program
+    .command('create <table>')
+    .description('Create a new record')
+    .requiredOption('-s, --server <id>', 'Server ID')
+    .requiredOption('-d, --database <name>', 'Database name')
+    .requiredOption('--data <json>', 'Record data as JSON')
+    .action(async (table: string, options) => {
+      const { CreateCommand } = await import('./cli/create');
+      const globalOpts = program.opts();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(options.data);
+      } catch {
+        logger.error('Invalid JSON data');
+        process.exit(1);
+        return;
+      }
+      const cmd = new CreateCommand({
+        table,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        data,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Update command
+  program
+    .command('update <table> <recordId>')
+    .description('Update an existing record')
+    .requiredOption('-s, --server <id>', 'Server ID')
+    .requiredOption('-d, --database <name>', 'Database name')
+    .requiredOption('--data <json>', 'Record data as JSON')
+    .action(async (table: string, recordId: string, options) => {
+      const { UpdateCommand } = await import('./cli/update');
+      const globalOpts = program.opts();
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(options.data);
+      } catch {
+        logger.error('Invalid JSON data');
+        process.exit(1);
+        return;
+      }
+      const cmd = new UpdateCommand({
+        table,
+        recordId: parseInt(recordId, 10),
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        data,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Delete command
+  program
+    .command('delete <table> <recordId>')
+    .description('Delete a record')
+    .requiredOption('-s, --server <id>', 'Server ID')
+    .requiredOption('-d, --database <name>', 'Database name')
+    .action(async (table: string, recordId: string, options) => {
+      const { DeleteCommand } = await import('./cli/delete');
+      const globalOpts = program.opts();
+      const cmd = new DeleteCommand({
+        table,
+        recordId: parseInt(recordId, 10),
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Schema command
+  program
+    .command('schema [table]')
+    .description('Display table schema')
+    .requiredOption('-s, --server <id>', 'Server ID')
+    .requiredOption('-d, --database <name>', 'Database name')
+    .action(async (table: string | undefined, options) => {
+      const { SchemaCommand } = await import('./cli/schema');
+      const globalOpts = program.opts();
+      const cmd = new SchemaCommand({
+        table,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  return program;
+}
+
+/**
+ * Main entry point
+ */
+export async function main(): Promise<void> {
+  const program = createProgram();
+  await program.parseAsync(process.argv);
+}
+
+// Export public API
+export { ODataClient, type ClientConfig } from './api/client';
+export { AuthManager } from './api/auth';
+export { EndpointBuilder } from './api/endpoints';
+export { ServerManager } from './config/servers';
+export { CredentialsManager } from './config/credentials';
+export { ProfileManager } from './config/profiles';
+export { OutputFormatter } from './utils/output';
+export { Logger, logger } from './utils/logger';
+export * from './types';
