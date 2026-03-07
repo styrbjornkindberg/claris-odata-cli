@@ -32,8 +32,13 @@ describe('Logger', () => {
       logger.info('should not appear');
       logger.warn('should appear');
 
-      expect(stdoutSpy).not.toHaveBeenCalled();
-      expect(stderrSpy).toHaveBeenCalled();
+      // At 'warn' level: debug and info should NOT appear, warn SHOULD appear
+      // warn goes to stdout, so we expect 1 call (the warn message)
+      expect(stdoutSpy).toHaveBeenCalledTimes(1);
+      const call = stdoutSpy.mock.calls[0]?.[0] ?? '';
+      expect(call).toContain('WARN');
+      expect(call).toContain('should appear');
+      expect(stderrSpy).not.toHaveBeenCalled();
     });
   });
 

@@ -46,7 +46,7 @@ export class GetCommand extends BaseCommand<GetOptions> {
    */
   async execute(): Promise<CommandResult> {
     // TODO: Implement actual API call
-    // Query options from this.options: filter, select, top, skip, orderby, count
+    // Query options available: filter, select, top, skip, orderby, count
     return {
       success: false,
       error: 'Get command not yet implemented',
