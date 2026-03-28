@@ -102,4 +102,110 @@ describe('CredentialsManager', () => {
       expect(result).toEqual([]);
     });
   });
+
+  describe('deleteCredential()', () => {
+    const mockDeletePassword = vi.mocked(keytar.deletePassword);
+
+    it('returns true when credentials were successfully deleted', async () => {
+      mockDeletePassword.mockResolvedValue(true);
+
+      const result = await manager.deleteCredential('server1', 'mydb', 'alice');
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when no credentials found to delete', async () => {
+      mockDeletePassword.mockResolvedValue(false);
+
+      const result = await manager.deleteCredential('server1', 'mydb', 'alice');
+
+      expect(result).toBe(false);
+    });
+
+    it('calls keytar.deletePassword with correct service name and account key', async () => {
+      mockDeletePassword.mockResolvedValue(true);
+
+      await manager.deleteCredential('server1', 'production', 'admin');
+
+      expect(mockDeletePassword).toHaveBeenCalledWith(
+        'claris-odata-cli',
+        'server1:production:admin'
+      );
+    });
+
+    it('builds account key in format {serverId}:{database}:{username}', async () => {
+      mockDeletePassword.mockResolvedValue(true);
+
+      await manager.deleteCredential('myserver', 'contacts-db', 'john.doe');
+
+      expect(mockDeletePassword).toHaveBeenCalledWith(
+        'claris-odata-cli',
+        'myserver:contacts-db:john.doe'
+      );
+    });
+
+    it('calls keytar.deletePassword exactly once per invocation', async () => {
+      mockDeletePassword.mockResolvedValue(true);
+
+      await manager.deleteCredential('server1', 'db', 'user');
+
+      expect(mockDeletePassword).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles special characters in serverId, database, and username', async () => {
+      mockDeletePassword.mockResolvedValue(true);
+
+      await manager.deleteCredential('server-1.local', 'my_db', 'user@domain.com');
+
+      expect(mockDeletePassword).toHaveBeenCalledWith(
+        'claris-odata-cli',
+        'server-1.local:my_db:user@domain.com'
+      );
+    });
+
+    it('returns false for unknown serverId (credential not found)', async () => {
+      mockDeletePassword.mockResolvedValue(false);
+
+      const result = await manager.deleteCredential('unknown-server', 'db', 'user');
+
+      expect(result).toBe(false);
+    });
+
+    it('returns false for wrong database (credential not found)', async () => {
+      mockDeletePassword.mockResolvedValue(false);
+
+      const result = await manager.deleteCredential('server1', 'wrong-db', 'alice');
+
+      expect(result).toBe(false);
+    });
+
+    it('returns false for wrong username (credential not found)', async () => {
+      mockDeletePassword.mockResolvedValue(false);
+
+      const result = await manager.deleteCredential('server1', 'mydb', 'wrong-user');
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('deleteCredentials() [deprecated — delegates to deleteCredential()]', () => {
+    const mockDeletePassword = vi.mocked(keytar.deletePassword);
+
+    it('returns true when credentials deleted (delegates to deleteCredential)', async () => {
+      mockDeletePassword.mockResolvedValue(true);
+
+      const result = await manager.deleteCredentials('server1', 'mydb', 'alice');
+
+      expect(result).toBe(true);
+      expect(mockDeletePassword).toHaveBeenCalledWith('claris-odata-cli', 'server1:mydb:alice');
+    });
+
+    it('returns false when credentials not found (delegates to deleteCredential)', async () => {
+      mockDeletePassword.mockResolvedValue(false);
+
+      const result = await manager.deleteCredentials('server1', 'mydb', 'alice');
+
+      expect(result).toBe(false);
+    });
+  });
 });
