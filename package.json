@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "fmo": "./dist/cli.js"
+    "fmo": "./dist/index.js",
+    "fmodata": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",

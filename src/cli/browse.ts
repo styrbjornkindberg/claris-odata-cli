@@ -273,6 +273,28 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
   }
 
   /**
+   * Prompt the user to select what to do after an action completes.
+   *
+   * Displays three navigation options:
+   * - "Back to tables": return to table selection for the current database
+   * - "Back to databases": return to database selection for the current server
+   * - "Exit": end the browse session and return the result
+   *
+   * @returns Navigation choice: 'tables', 'databases', or 'exit'
+   */
+  async selectPostActionNavigation(): Promise<'tables' | 'databases' | 'exit'> {
+    const choice = await select<string>({
+      message: 'What would you like to do next?',
+      choices: [
+        { name: '← Back to tables', value: 'tables' },
+        { name: '← Back to databases', value: 'databases' },
+        { name: 'Exit', value: 'exit' },
+      ],
+    });
+    return choice as 'tables' | 'databases' | 'exit';
+  }
+
+  /**
    * Execute the selected action against the given table using ODataClient.
    *
    * Builds an ODataClient from the server config and credentials, then
@@ -511,6 +533,9 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
             break;
           }
 
+          // Track post-action navigation choice to propagate breaks up the loop stack
+          let postActionNav: 'tables' | 'databases' | 'exit' | null = null;
+
           // Action selection loop (T016)
           // eslint-disable-next-line no-constant-condition
           while (true) {
@@ -543,8 +568,8 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
               process.stdout.write(`Error: ${actionResult.error ?? 'Action failed'}\n`);
             }
 
-            // After action, return result with context
-            return {
+            // Build the result to return if user chooses Exit
+            const finalResult = {
               success: actionResult.success,
               data: actionResult.success
                 ? {
@@ -559,6 +584,23 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
                 : actionResult.data,
               error: actionResult.error,
             };
+
+            // Post-action navigation (T017)
+            const navChoice = await this.selectPostActionNavigation();
+            postActionNav = navChoice;
+
+            if (navChoice === 'exit') {
+              return finalResult;
+            }
+
+            // For 'tables': break action loop, table loop continues -> back to selectTable
+            // For 'databases': break action loop, then also break table loop (handled below)
+            break;
+          }
+
+          // If user navigated to databases, break out of the table loop too
+          if (postActionNav === 'databases') {
+            break; // break table loop -> fall through to database loop
           }
           // Looping back to table selection
         }
