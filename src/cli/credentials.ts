@@ -7,7 +7,7 @@
  */
 
 import { BaseCommand, type CommandOptions } from './index';
-import type { CommandResult, CredentialEntry } from '../types';
+import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 
