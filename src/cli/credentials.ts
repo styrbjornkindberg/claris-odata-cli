@@ -202,7 +202,7 @@ export class CredentialsCommand extends BaseCommand<CredentialsOptions> {
       data: {
         serverId: serverId!,
         serverName,
-        entries,
+        entries: entries.map(({ database, username }) => ({ database, username })),
       },
     };
   }
@@ -263,12 +263,8 @@ export class CredentialsCommand extends BaseCommand<CredentialsOptions> {
 
       // For list action, return just the entries array
       if (this.options.action === 'list') {
-        const entries = (data.entries as CredentialEntry[]) ?? [];
-        return JSON.stringify(
-          entries.map((e) => ({ database: e.database, username: e.username })),
-          null,
-          2
-        );
+        const entries = (data.entries as Array<{ database: string; username: string }>) ?? [];
+        return JSON.stringify(entries, null, 2);
       }
 
       return JSON.stringify(data, null, 2);
@@ -279,7 +275,7 @@ export class CredentialsCommand extends BaseCommand<CredentialsOptions> {
     // Handle list action
     if (this.options.action === 'list') {
       const serverName = data.serverName as string;
-      const entries = (data.entries as CredentialEntry[]) ?? [];
+      const entries = (data.entries as Array<{ database: string; username: string }>) ?? [];
 
       if (entries.length === 0) {
         return `No credentials stored for server "${serverName}".`;
