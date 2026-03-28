@@ -14,6 +14,15 @@ import keytar from 'keytar';
 const SERVICE_NAME = 'claris-odata-cli';
 
 /**
+ * Credential entry returned by listCredentials
+ */
+export interface CredentialEntry {
+  serverId: string;
+  database: string;
+  username: string;
+}
+
+/**
  * Credentials manager using system keychain
  *
  * Provides secure storage for FileMaker credentials.
@@ -77,6 +86,31 @@ export class CredentialsManager {
    */
   private buildAccountKey(serverId: string, database: string, username: string): string {
     return `${serverId}:${database}:${username}`;
+  }
+
+  /**
+   * List all credentials stored for a given server
+   *
+   * @param serverId - Server ID to filter by
+   * @returns Array of CredentialEntry objects (no passwords)
+   */
+  async listCredentials(serverId: string): Promise<CredentialEntry[]> {
+    const allCredentials = await keytar.findCredentials(SERVICE_NAME);
+    const results: CredentialEntry[] = [];
+
+    for (const { account } of allCredentials) {
+      const parts = account.split(':');
+      if (parts.length !== 3) {
+        // Silently skip malformed entries
+        continue;
+      }
+      const [entryServerId, database, username] = parts;
+      if (entryServerId === serverId) {
+        results.push({ serverId: entryServerId, database, username });
+      }
+    }
+
+    return results;
   }
 
   /**
