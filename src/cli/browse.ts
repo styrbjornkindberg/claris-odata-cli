@@ -180,12 +180,80 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
   }
 
   /**
+   * Fetch the list of available tables from a FileMaker database.
+   *
+   * Calls the OData service document endpoint at /fmi/odata/v4/{database},
+   * which returns a list of available tables (EntitySets), filtering out
+   * FunctionImport entries.
+   *
+   * @param server - The server configuration (id, host, port, secure)
+   * @param credentials - Resolved credentials for authentication
+   * @param database - The selected database name
+   * @returns Array of table names
+   * @throws Error on connection failure or authentication error
+   */
+  async fetchTables(
+    server: { host: string; port?: number; secure?: boolean },
+    credentials: BrowseCredentials,
+    database: string
+  ): Promise<string[]> {
+    const protocol = server.secure !== false ? 'https' : 'http';
+    const port = server.port ?? 443;
+    const baseUrl = `${protocol}://${server.host}:${port}`;
+
+    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
+
+    const response = await axios.get<ODataServiceDocument>(
+      `${baseUrl}/fmi/odata/v4/${encodeURIComponent(database)}`,
+      {
+        headers: {
+          Authorization: `Basic ${authToken}`,
+          Accept: 'application/json',
+          'OData-Version': '4.0',
+          'OData-MaxVersion': '4.0',
+        },
+        timeout: 30000,
+      }
+    );
+
+    const entries = response.data?.value ?? [];
+    return entries
+      .filter((e) => e.kind !== 'FunctionImport')
+      .map((e) => e.name)
+      .filter(Boolean);
+  }
+
+  /**
+   * Prompt the user to select a table from the list.
+   *
+   * Displays tables in a select() menu with a "Back" option at the top.
+   * Returns the selected table name, or null if "Back" was chosen.
+   *
+   * @param tables - List of table names to display
+   * @returns Selected table name, or null for "Back"
+   */
+  async selectTable(tables: string[]): Promise<string | null> {
+    const BACK = '__back__';
+
+    const choice = await select<string>({
+      message: 'Select a table:',
+      choices: [
+        { name: '← Back', value: BACK },
+        ...tables.map((t) => ({ name: t, value: t })),
+      ],
+    });
+
+    return choice === BACK ? null : choice;
+  }
+
+  /**
    * Execute the browse command.
    *
    * Exits with code 1 if not running in an interactive terminal.
    * Prompts user to select a server if servers are configured.
    * Resolves credentials for the selected server (from keychain or prompt).
    * Fetches and displays available databases for selection.
+   * Fetches and displays available tables for selection.
    * Displays helpful message if no servers are configured.
    *
    * @returns Command result
@@ -287,16 +355,71 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
           break;
         }
 
-        // Database selected — return result
-        return {
-          success: true,
-          data: {
-            serverId: credentials.serverId,
-            database: selectedDatabase,
-            username: credentials.username,
-            // password is intentionally omitted from result data to avoid leaking
-          },
-        };
+        // Table selection loop (T015)
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          let tables: string[];
+          try {
+            tables = await this.fetchTables(
+              selectedServer ?? { host: serverId },
+              credentials,
+              selectedDatabase
+            );
+          } catch (err) {
+            const isAuthError =
+              err instanceof Error &&
+              (err.message.includes('401') || err.message.includes('403') || err.message.toLowerCase().includes('auth'));
+
+            if (isAuthError) {
+              process.stdout.write('Authentication failed. Please check your credentials.\n');
+            } else {
+              process.stdout.write('Connection error: Could not reach the server.\n');
+            }
+
+            const action = await select({
+              message: 'What would you like to do?',
+              choices: [
+                { name: 'Retry', value: 'retry' },
+                { name: '← Back to database selection', value: 'back' },
+              ],
+            });
+
+            if (action === 'back') break; // back to database selection
+            continue; // retry fetchTables
+          }
+
+          if (tables.length === 0) {
+            process.stdout.write('No tables found in this database.\n');
+            const action = await select({
+              message: 'What would you like to do?',
+              choices: [
+                { name: '← Back to database selection', value: 'back' },
+              ],
+            });
+            void action; // always back
+            break; // back to database selection
+          }
+
+          const selectedTable = await this.selectTable(tables);
+
+          if (selectedTable === null) {
+            // User chose "Back" — return to database selection loop
+            break;
+          }
+
+          // Table selected — return result
+          return {
+            success: true,
+            data: {
+              serverId: credentials.serverId,
+              database: selectedDatabase,
+              table: selectedTable,
+              username: credentials.username,
+              // password is intentionally omitted from result data to avoid leaking
+            },
+          };
+        }
+        // Looping back to database selection
       }
       // Looping back to server selection
     }
