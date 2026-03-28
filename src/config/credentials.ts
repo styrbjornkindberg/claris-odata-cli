@@ -7,20 +7,12 @@
  */
 
 import keytar from 'keytar';
+import type { CredentialEntry } from '../types';
 
 /**
  * Service name for keychain storage
  */
 const SERVICE_NAME = 'claris-odata-cli';
-
-/**
- * Credential entry returned by listCredentials
- */
-export interface CredentialEntry {
-  serverId: string;
-  database: string;
-  username: string;
-}
 
 /**
  * Credentials manager using system keychain
