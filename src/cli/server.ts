@@ -11,6 +11,9 @@ import type { CommandResult, Server } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { ExitCode } from '../api/errors';
+import { CredentialsCommand } from './credentials';
+
+export { CredentialsCommand };
 
 /**
  * Server command action
