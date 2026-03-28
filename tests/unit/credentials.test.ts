@@ -2,7 +2,8 @@
  * Tests for CredentialsManager
  */
 
-import { CredentialsManager, CredentialEntry } from '../../src/config/credentials';
+import { CredentialsManager } from '../../src/config/credentials';
+import type { CredentialEntry } from '../../src/types';
 
 // Mock keytar
 vi.mock('keytar', () => ({
