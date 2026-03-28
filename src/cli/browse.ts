@@ -8,10 +8,11 @@
  */
 
 import { select, input, password } from '@inquirer/prompts';
+import axios from 'axios';
 import { BaseCommand, type CommandOptions } from './index';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
-import type { CommandResult } from '../types';
+import type { CommandResult, CredentialEntry } from '../types';
 
 /**
  * Browse command options
@@ -35,6 +36,13 @@ export interface BrowseCredentials {
   username: string;
   /** Password (in-memory only, never logged) */
   password: string;
+}
+
+/**
+ * OData service document response shape
+ */
+interface ODataServiceDocument {
+  value: Array<{ name: string; kind: string; url: string }>;
 }
 
 /**
@@ -69,7 +77,7 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
   async resolveCredentials(serverId: string): Promise<BrowseCredentials> {
     const manager = new CredentialsManager();
 
-    let storedCredentials;
+    let storedCredentials: CredentialEntry[] = [];
     try {
       storedCredentials = await manager.listCredentials(serverId);
     } catch {
@@ -111,11 +119,73 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
   }
 
   /**
+   * Fetch the list of available databases from a FileMaker server.
+   *
+   * Calls the OData service document endpoint at /fmi/odata/v4, which
+   * returns a list of available databases (EntitySets).
+   *
+   * @param server - The server configuration (id, host, port, secure)
+   * @param credentials - Resolved credentials for authentication
+   * @returns Array of database names
+   * @throws Error on connection failure or authentication error
+   */
+  async fetchDatabases(
+    server: { host: string; port?: number; secure?: boolean },
+    credentials: BrowseCredentials
+  ): Promise<string[]> {
+    const protocol = server.secure !== false ? 'https' : 'http';
+    const port = server.port ?? 443;
+    const baseUrl = `${protocol}://${server.host}:${port}`;
+
+    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
+
+    const response = await axios.get<ODataServiceDocument>(`${baseUrl}/fmi/odata/v4`, {
+      headers: {
+        Authorization: `Basic ${authToken}`,
+        Accept: 'application/json',
+        'OData-Version': '4.0',
+        'OData-MaxVersion': '4.0',
+      },
+      timeout: 30000,
+    });
+
+    const entries = response.data?.value ?? [];
+    return entries
+      .filter((e) => e.kind === 'EntityContainer' || e.kind === undefined || e.kind !== 'FunctionImport')
+      .map((e) => e.name)
+      .filter(Boolean);
+  }
+
+  /**
+   * Prompt the user to select a database from the list.
+   *
+   * Displays databases in a select() menu with a "Back" option at the top.
+   * Returns the selected database name, or null if "Back" was chosen.
+   *
+   * @param databases - List of database names to display
+   * @returns Selected database name, or null for "Back"
+   */
+  async selectDatabase(databases: string[]): Promise<string | null> {
+    const BACK = '__back__';
+
+    const choice = await select<string>({
+      message: 'Select a database:',
+      choices: [
+        { name: '← Back', value: BACK },
+        ...databases.map((db) => ({ name: db, value: db })),
+      ],
+    });
+
+    return choice === BACK ? null : choice;
+  }
+
+  /**
    * Execute the browse command.
    *
    * Exits with code 1 if not running in an interactive terminal.
    * Prompts user to select a server if servers are configured.
    * Resolves credentials for the selected server (from keychain or prompt).
+   * Fetches and displays available databases for selection.
    * Displays helpful message if no servers are configured.
    *
    * @returns Command result
@@ -143,33 +213,92 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
       };
     }
 
-    const serverId = await select({
-      message: 'Select a server:',
-      choices: servers.map((server) => ({
-        name: `${server.name} (${server.id})`,
-        value: server.id,
-      })),
-    });
+    // Server selection loop (allows coming back from database selection)
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const serverId = await select({
+        message: 'Select a server:',
+        choices: servers.map((server) => ({
+          name: `${server.name} (${server.id})`,
+          value: server.id,
+        })),
+      });
 
-    // Resolve credentials for the selected server (T013)
-    let credentials: BrowseCredentials;
-    try {
-      credentials = await this.resolveCredentials(serverId);
-    } catch {
-      return {
-        success: false,
-        error: 'Failed to resolve credentials.',
-      };
+      // Resolve credentials for the selected server (T013)
+      let credentials: BrowseCredentials;
+      try {
+        credentials = await this.resolveCredentials(serverId);
+      } catch {
+        return {
+          success: false,
+          error: 'Failed to resolve credentials.',
+        };
+      }
+
+      // Database selection loop (T014)
+      const selectedServer = servers.find((s) => s.id === serverId);
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        let databases: string[];
+        try {
+          databases = await this.fetchDatabases(
+            selectedServer ?? { host: serverId },
+            credentials
+          );
+        } catch (err) {
+          const isAuthError =
+            err instanceof Error &&
+            (err.message.includes('401') || err.message.includes('403') || err.message.toLowerCase().includes('auth'));
+
+          if (isAuthError) {
+            process.stdout.write('Authentication failed. Please check your credentials.\n');
+          } else {
+            process.stdout.write('Connection error: Could not reach the server.\n');
+          }
+
+          const action = await select({
+            message: 'What would you like to do?',
+            choices: [
+              { name: 'Retry', value: 'retry' },
+              { name: '← Back to server selection', value: 'back' },
+            ],
+          });
+
+          if (action === 'back') break; // back to server selection
+          continue; // retry fetchDatabases
+        }
+
+        if (databases.length === 0) {
+          process.stdout.write('No databases found on this server.\n');
+          const action = await select({
+            message: 'What would you like to do?',
+            choices: [
+              { name: '← Back to server selection', value: 'back' },
+            ],
+          });
+          void action; // always back
+          break; // back to server selection
+        }
+
+        const selectedDatabase = await this.selectDatabase(databases);
+
+        if (selectedDatabase === null) {
+          // User chose "Back" — return to server selection
+          break;
+        }
+
+        // Database selected — return result
+        return {
+          success: true,
+          data: {
+            serverId: credentials.serverId,
+            database: selectedDatabase,
+            username: credentials.username,
+            // password is intentionally omitted from result data to avoid leaking
+          },
+        };
+      }
+      // Looping back to server selection
     }
-
-    return {
-      success: true,
-      data: {
-        serverId: credentials.serverId,
-        database: credentials.database,
-        username: credentials.username,
-        // password is intentionally omitted from result data to avoid leaking
-      },
-    };
   }
 }
