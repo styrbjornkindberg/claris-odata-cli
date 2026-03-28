@@ -7,7 +7,9 @@
  * @module cli/browse
  */
 
+import { select } from '@inquirer/prompts';
 import { BaseCommand, type CommandOptions } from './index';
+import { ServerManager } from '../config/servers';
 import type { CommandResult } from '../types';
 
 /**
@@ -43,6 +45,8 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
    * Execute the browse command.
    *
    * Exits with code 1 if not running in an interactive terminal.
+   * Prompts user to select a server if servers are configured.
+   * Displays helpful message if no servers are configured.
    *
    * @returns Command result
    */
@@ -55,10 +59,32 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
       process.exit(1);
     }
 
-    // TODO: Implement interactive browse levels (T012–T022)
+    const manager = new ServerManager();
+    const servers = manager.listServers();
+
+    if (servers.length === 0) {
+      process.stdout.write(
+        'No servers configured.\n' +
+          'Use `fmo server add` to add a FileMaker server.\n'
+      );
+      return {
+        success: true,
+        data: { message: 'No servers configured.' },
+      };
+    }
+
+    const serverId = await select({
+      message: 'Select a server:',
+      choices: servers.map((server) => ({
+        name: `${server.name} (${server.id})`,
+        value: server.id,
+      })),
+    });
+
+    // Store selection and prepare for T013 (credential resolution)
     return {
       success: true,
-      data: { message: 'Interactive browse not yet implemented.' },
+      data: { serverId },
     };
   }
 }
