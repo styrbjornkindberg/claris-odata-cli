@@ -12,7 +12,8 @@ import axios from 'axios';
 import { BaseCommand, type CommandOptions } from './index';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
-import type { CommandResult, CredentialEntry } from '../types';
+import { ODataClient } from '../api/client';
+import type { CommandResult, CredentialEntry, BrowseAction } from '../types';
 
 /**
  * Browse command options
@@ -247,6 +248,108 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
   }
 
   /**
+   * Prompt the user to select an action to perform on the selected table.
+   *
+   * Displays an action menu via select() with 4 actions plus a "Back" option.
+   * Returns the selected action, or null if "Back" was chosen.
+   *
+   * @returns Selected BrowseAction, or null for "Back"
+   */
+  async selectAction(): Promise<BrowseAction | null> {
+    const BACK = '__back__';
+
+    const choice = await select<string>({
+      message: 'Select an action:',
+      choices: [
+        { name: '← Back', value: BACK },
+        { name: 'List Records', value: 'list-records' },
+        { name: 'Get Record by ID', value: 'get-record' },
+        { name: 'Create Record', value: 'create-record' },
+        { name: 'View Schema', value: 'view-schema' },
+      ],
+    });
+
+    return choice === BACK ? null : (choice as BrowseAction);
+  }
+
+  /**
+   * Execute the selected action against the given table using ODataClient.
+   *
+   * Builds an ODataClient from the server config and credentials, then
+   * dispatches to the appropriate operation based on the selected action.
+   *
+   * @param server - The server configuration (host, port, secure)
+   * @param credentials - Resolved credentials for authentication
+   * @param table - The selected table name
+   * @param action - The selected action to perform
+   * @returns Command result
+   */
+  async executeAction(
+    server: { host: string; port?: number; secure?: boolean },
+    credentials: BrowseCredentials,
+    table: string,
+    action: BrowseAction
+  ): Promise<CommandResult> {
+    const protocol = server.secure !== false ? 'https' : 'http';
+    const port = server.port ?? 443;
+    const baseUrl = `${protocol}://${server.host}:${port}`;
+    const authToken = `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}`;
+
+    const client = new ODataClient({
+      baseUrl,
+      database: credentials.database,
+      authToken,
+    });
+
+    switch (action) {
+      case 'list-records': {
+        const records = await client.getRecords(table);
+        return { success: true, data: records };
+      }
+
+      case 'get-record': {
+        const idStr = await input({ message: 'Record ID:' });
+        const recordId = parseInt(idStr, 10);
+        if (isNaN(recordId)) {
+          return { success: false, error: `Invalid record ID: ${idStr}` };
+        }
+        const record = await client.getRecord(table, recordId);
+        return { success: true, data: record };
+      }
+
+      case 'create-record': {
+        const jsonStr = await input({ message: 'Record data (JSON):' });
+        let data: Record<string, unknown>;
+        try {
+          data = JSON.parse(jsonStr) as Record<string, unknown>;
+        } catch {
+          return { success: false, error: 'Invalid JSON for record data.' };
+        }
+        const created = await client.createRecord(table, data);
+        return { success: true, data: created };
+      }
+
+      case 'view-schema': {
+        // Fetch OData $metadata XML for the table
+        const metaUrl = `/fmi/odata/v4/${encodeURIComponent(credentials.database)}/$metadata`;
+        const response = await axios.get<string>(`${baseUrl}${metaUrl}`, {
+          headers: {
+            Authorization: authToken,
+            Accept: 'application/xml',
+            'OData-Version': '4.0',
+            'OData-MaxVersion': '4.0',
+          },
+          timeout: 30000,
+        });
+        return { success: true, data: { schema: response.data, table } };
+      }
+
+      default:
+        return { success: false, error: `Unknown action: ${action as string}` };
+    }
+  }
+
+  /**
    * Execute the browse command.
    *
    * Exits with code 1 if not running in an interactive terminal.
@@ -254,6 +357,7 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
    * Resolves credentials for the selected server (from keychain or prompt).
    * Fetches and displays available databases for selection.
    * Fetches and displays available tables for selection.
+   * Displays action menu after table selection and executes selected action.
    * Displays helpful message if no servers are configured.
    *
    * @returns Command result
@@ -407,17 +511,56 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
             break;
           }
 
-          // Table selected — return result
-          return {
-            success: true,
-            data: {
-              serverId: credentials.serverId,
-              database: selectedDatabase,
-              table: selectedTable,
-              username: credentials.username,
-              // password is intentionally omitted from result data to avoid leaking
-            },
-          };
+          // Action selection loop (T016)
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const selectedAction = await this.selectAction();
+
+            if (selectedAction === null) {
+              // User chose "Back" — return to table selection loop
+              break;
+            }
+
+            // Execute the selected action
+            let actionResult: CommandResult;
+            try {
+              actionResult = await this.executeAction(
+                selectedServer ?? { host: serverId },
+                credentials,
+                selectedTable,
+                selectedAction
+              );
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'Unknown error';
+              process.stdout.write(`Action failed: ${message}\n`);
+              actionResult = { success: false, error: message };
+            }
+
+            if (actionResult.success && actionResult.data !== undefined) {
+              const output = JSON.stringify(actionResult.data, null, 2);
+              process.stdout.write(`${output}\n`);
+            } else if (!actionResult.success) {
+              process.stdout.write(`Error: ${actionResult.error ?? 'Action failed'}\n`);
+            }
+
+            // After action, return result with context
+            return {
+              success: actionResult.success,
+              data: actionResult.success
+                ? {
+                    serverId: credentials.serverId,
+                    database: selectedDatabase,
+                    table: selectedTable,
+                    username: credentials.username,
+                    action: selectedAction,
+                    result: actionResult.data,
+                    // password is intentionally omitted from result data to avoid leaking
+                  }
+                : actionResult.data,
+              error: actionResult.error,
+            };
+          }
+          // Looping back to table selection
         }
         // Looping back to database selection
       }
