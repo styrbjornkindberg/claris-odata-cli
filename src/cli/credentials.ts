@@ -226,7 +226,7 @@ export class CredentialsCommand extends BaseCommand<CredentialsOptions> {
     }
 
     const credentials = new CredentialsManager();
-    const removed = await credentials.deleteCredentials(serverId!, database!, username!);
+    const removed = await credentials.deleteCredential(serverId!, database!, username!);
 
     if (!removed) {
       return {

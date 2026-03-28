@@ -34,7 +34,7 @@ vi.mock('../../../src/config/credentials', () => ({
   CredentialsManager: vi.fn().mockImplementation(() => ({
     listCredentials: vi.fn(),
     storeCredentials: vi.fn().mockResolvedValue(undefined),
-    deleteCredentials: vi.fn().mockResolvedValue(true),
+    deleteCredential: vi.fn().mockResolvedValue(true),
     getCredentials: vi.fn().mockResolvedValue(null),
     hasCredentials: vi.fn().mockResolvedValue(false),
   })),
@@ -43,7 +43,7 @@ vi.mock('../../../src/config/credentials', () => ({
 const mockGetServer = vi.fn();
 const mockListCredentials = vi.fn();
 const mockStoreCredentials = vi.fn().mockResolvedValue(undefined);
-const mockDeleteCredentials = vi.fn().mockResolvedValue(true);
+const mockDeleteCredential = vi.fn().mockResolvedValue(true);
 
 const DEFAULT_SERVER = { id: 'dev', name: 'dev', host: 'fms.local', port: 443, secure: true };
 
@@ -69,7 +69,7 @@ function setupMocks({
   vi.mocked(CredentialsManager).mockImplementation(() => ({
     listCredentials: mockListCredentials.mockResolvedValue(credentials),
     storeCredentials: mockStoreCredentials,
-    deleteCredentials: mockDeleteCredentials.mockResolvedValue(deleteResult),
+    deleteCredential: mockDeleteCredential.mockResolvedValue(deleteResult),
     getCredentials: vi.fn().mockResolvedValue(null),
     hasCredentials: vi.fn().mockResolvedValue(false),
   }));
@@ -328,5 +328,16 @@ describe('CredentialsCommand — remove action', () => {
     const result = await cmd.execute();
     expect(result.success).toBe(false);
     expect(result.error).toContain('Database name is required');
+  });
+
+  it('returns error when username is missing', async () => {
+    const cmd = new CredentialsCommand({
+      action: 'remove',
+      serverId: 'dev',
+      database: 'contacts',
+    });
+    const result = await cmd.execute();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Username is required');
   });
 });
