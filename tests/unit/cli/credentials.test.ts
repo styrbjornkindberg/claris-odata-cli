@@ -11,6 +11,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CredentialsCommand } from '../../../src/cli/credentials';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
+import { password as promptPassword } from '@inquirer/prompts';
+
+// Mock @inquirer/prompts
+vi.mock('@inquirer/prompts', () => ({
+  password: vi.fn().mockResolvedValue('prompted-secret'),
+}));
 
 // Mock ServerManager
 vi.mock('../../../src/config/servers', () => ({
@@ -180,7 +186,7 @@ describe('CredentialsCommand — add action', () => {
     const result = await cmd.execute();
     expect(result.success).toBe(true);
     const data = result.data as Record<string, unknown>;
-    expect(data['message']).toContain('Credentials stored for server "dev"');
+    expect(data['message']).toContain('Saved credentials for server "dev"');
     expect(data['message']).toContain('contacts');
     expect(data['message']).toContain('admin');
   });
@@ -196,12 +202,12 @@ describe('CredentialsCommand — add action', () => {
     });
     const result = await cmd.execute();
     const output = cmd.formatOutput(result);
-    expect(output).toContain('Credentials stored for server "dev"');
+    expect(output).toContain('Saved credentials for server "dev"');
     expect(output).toContain('contacts');
     expect(output).toContain('admin');
   });
 
-  it('formats JSON output with serverId, database, username, message', async () => {
+  it('formats JSON output with database and username only (spec format)', async () => {
     setupMocks();
     const cmd = new CredentialsCommand({
       action: 'add',
@@ -214,10 +220,27 @@ describe('CredentialsCommand — add action', () => {
     const result = await cmd.execute();
     const output = cmd.formatOutput(result);
     const parsed = JSON.parse(output) as Record<string, string>;
-    expect(parsed['serverId']).toBe('dev');
     expect(parsed['database']).toBe('contacts');
     expect(parsed['username']).toBe('admin');
-    expect(typeof parsed['message']).toBe('string');
+    // Per spec: JSON output is { database, username } — no serverId/message/password
+    expect(parsed).not.toHaveProperty('serverId');
+    expect(parsed).not.toHaveProperty('password');
+  });
+
+  it('prompts for password when --password is omitted', async () => {
+    setupMocks();
+    vi.mocked(promptPassword).mockResolvedValue('prompted-secret');
+    const cmd = new CredentialsCommand({
+      action: 'add',
+      serverId: 'dev',
+      database: 'contacts',
+      username: 'admin',
+      // no password
+    });
+    const result = await cmd.execute();
+    expect(result.success).toBe(true);
+    expect(vi.mocked(promptPassword)).toHaveBeenCalledOnce();
+    expect(mockStoreCredentials).toHaveBeenCalledWith('dev', 'contacts', 'admin', 'prompted-secret');
   });
 
   it('returns error when server not found', async () => {
@@ -256,6 +279,42 @@ describe('CredentialsCommand — add action', () => {
     const result = await cmd.execute();
     expect(result.success).toBe(false);
     expect(result.error).toContain('Username is required');
+  });
+
+  it('returns error when password prompt returns empty string', async () => {
+    setupMocks();
+    vi.mocked(promptPassword).mockResolvedValue('');
+    const cmd = new CredentialsCommand({
+      action: 'add',
+      serverId: 'dev',
+      database: 'contacts',
+      username: 'admin',
+      // no password — prompt returns empty
+    });
+    const result = await cmd.execute();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Password is required');
+  });
+
+  it('returns error when keychain save fails', async () => {
+    setupMocks();
+    vi.mocked(CredentialsManager).mockImplementation(() => ({
+      listCredentials: vi.fn().mockResolvedValue([]),
+      storeCredentials: vi.fn().mockRejectedValue(new Error('Keychain write failed')),
+      deleteCredential: vi.fn().mockResolvedValue(true),
+      getCredentials: vi.fn().mockResolvedValue(null),
+      hasCredentials: vi.fn().mockResolvedValue(false),
+    }));
+    const cmd = new CredentialsCommand({
+      action: 'add',
+      serverId: 'dev',
+      database: 'contacts',
+      username: 'admin',
+      password: 'secret',
+    });
+    const result = await cmd.execute();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Keychain write failed');
   });
 });
 

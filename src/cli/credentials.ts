@@ -6,6 +6,7 @@
  * @module cli/credentials
  */
 
+import { password as promptPassword } from '@inquirer/prompts';
 import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
@@ -152,11 +153,15 @@ export class CredentialsCommand extends BaseCommand<CredentialsOptions> {
       };
     }
 
-    const credPassword = password ?? '';
+    let credPassword = password ?? '';
+    if (!credPassword) {
+      credPassword = await promptPassword({ message: 'Enter password:' });
+    }
+
     if (!credPassword) {
       return {
         success: false,
-        error: 'Error: Password is required. Use --password <password>',
+        error: 'Error: Password is required.',
       };
     }
 
@@ -170,7 +175,7 @@ export class CredentialsCommand extends BaseCommand<CredentialsOptions> {
         serverName,
         database: database!,
         username: username!,
-        message: `Credentials stored for server "${serverName}" (database: ${database}, user: ${username})`,
+        message: `Saved credentials for server "${serverName}", database "${database}", username "${username}".`,
       },
     };
   }
@@ -265,6 +270,11 @@ export class CredentialsCommand extends BaseCommand<CredentialsOptions> {
       if (this.options.action === 'list') {
         const entries = (data.entries as Array<{ database: string; username: string }>) ?? [];
         return JSON.stringify(entries, null, 2);
+      }
+
+      // For add action, return just database + username per spec
+      if (this.options.action === 'add') {
+        return JSON.stringify({ database: data['database'], username: data['username'] }, null, 2);
       }
 
       return JSON.stringify(data, null, 2);
