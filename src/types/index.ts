@@ -39,6 +39,30 @@ export interface Credentials {
 }
 
 /**
+ * Represents a stored credential entry in the system keychain.
+ *
+ * This is used by the credential add/list/remove commands and the browse
+ * authentication flow. Unlike the broader `Credentials` interface, this type
+ * only captures the identity metadata — the password itself is NEVER stored
+ * here; it lives exclusively in the OS keychain.
+ *
+ * @example
+ * const entry: CredentialEntry = {
+ *   serverId: 'prod-server',
+ *   database: 'SalesDB',
+ *   username: 'alice',
+ * };
+ */
+export interface CredentialEntry {
+  /** Server ID that these credentials belong to */
+  serverId: string;
+  /** Database name the credentials are scoped to */
+  database: string;
+  /** Username (password is stored in system keychain, never here) */
+  username: string;
+}
+
+/**
  * Environment profile for managing multiple configurations
  */
 export interface Profile {
@@ -127,6 +151,41 @@ export interface CommandResult<T = unknown> {
   /** Error message if failed */
   error?: string;
 }
+
+// ============================================================================
+// Browse Types
+// ============================================================================
+
+/**
+ * Represents the current navigation level in the interactive browse TUI.
+ *
+ * The browse command lets users drill down through a hierarchy:
+ *   server → database → table → action
+ *
+ * Used by TUI state management and navigation tracking.
+ *
+ * @example
+ * let level: BrowseLevel = 'server';
+ * // After selecting a server:
+ * level = 'database';
+ */
+export type BrowseLevel = 'server' | 'database' | 'table' | 'action';
+
+/**
+ * Represents an action available at the table level in the browse TUI.
+ *
+ * After the user navigates to a table, they choose one of these actions.
+ * Used by the action menu and post-action routing logic.
+ *
+ * - `list-records`  — List all records in the table
+ * - `get-record`    — Get a single record by ID
+ * - `create-record` — Create a new record
+ * - `view-schema`   — View the table schema / field definitions
+ *
+ * @example
+ * const action: BrowseAction = 'list-records';
+ */
+export type BrowseAction = 'list-records' | 'get-record' | 'create-record' | 'view-schema';
 
 // ============================================================================
 // Logger Types
