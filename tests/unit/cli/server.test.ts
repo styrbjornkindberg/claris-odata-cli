@@ -4,8 +4,13 @@
  * Tests warning behavior when --password is provided without
  * --username and/or --database on the `server add` command.
  *
+ * Acceptance scenarios from specs/008-browse-credentials/spec.md (T010 / FR-006):
+ * 1. --password without --username → warning: "credentials were not stored because --username and --database are also required"
+ * 2. --password + --username without --database → warning: "--database is also required to store credentials"
+ * 3. All three provided → no warning
+ *
  * @module tests/unit/cli/server.test
- * @see specs/007-interactive-navigation/spec.md T001
+ * @see specs/008-browse-credentials/spec.md T010
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -45,41 +50,41 @@ vi.mock('../../../src/config/credentials', () => ({
   })),
 }));
 
-describe('ServerCommand - server add password warning (T001)', () => {
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+describe('ServerCommand - server add incomplete-credential warnings (T010)', () => {
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
-  it('warns when --password is given without --username and --database', async () => {
+  // Acceptance Scenario 1: --password without --username (and no --database)
+  it('warns with combined message when --password is given without --username and --database', async () => {
     const cmd = new ServerCommand({
       action: 'add',
-      name: 'MyServer',
-      host: 'fms.example.com',
+      name: 'dev',
+      host: 'example.com',
       password: 'secret',
     });
 
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('--username is missing')
-    );
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('--database is missing')
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('credentials were not stored because --username and --database are also required')
     );
   });
 
-  it('warns when --password and --username are given but --database is missing', async () => {
+  // Acceptance Scenario 2: --password + --username, but no --database
+  it('warns that --database is also required when --password and --username given but --database missing', async () => {
     const cmd = new ServerCommand({
       action: 'add',
-      name: 'MyServer',
-      host: 'fms.example.com',
+      name: 'dev',
+      host: 'example.com',
       password: 'secret',
       username: 'admin',
     });
@@ -87,41 +92,18 @@ describe('ServerCommand - server add password warning (T001)', () => {
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('--database is missing')
-    );
-    // Should NOT warn about missing username
-    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('--username is missing')
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('--database is also required to store credentials')
     );
   });
 
-  it('warns when --password and --database are given but --username is missing', async () => {
-    const cmd = new ServerCommand({
-      action: 'add',
-      name: 'MyServer',
-      host: 'fms.example.com',
-      password: 'secret',
-      database: 'MyDB',
-    });
-
-    const result = await cmd.execute();
-
-    expect(result.success).toBe(true);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('--username is missing')
-    );
-    // Should NOT warn about missing database
-    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('--database is missing')
-    );
-  });
-
+  // Acceptance Scenario 3: All three provided — no warning
   it('does NOT warn when --password, --username, and --database are all provided', async () => {
     const cmd = new ServerCommand({
       action: 'add',
-      name: 'MyServer',
-      host: 'fms.example.com',
+      name: 'dev',
+      host: 'example.com',
       password: 'secret',
       username: 'admin',
       database: 'MyDB',
@@ -130,29 +112,54 @@ describe('ServerCommand - server add password warning (T001)', () => {
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('--username is missing')
-    );
-    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('--database is missing')
-    );
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
   });
 
-  it('does NOT warn when --password is not provided', async () => {
+  // Edge case: --password + --database but no --username
+  it('warns that --username is also required when --password and --database given but --username missing', async () => {
     const cmd = new ServerCommand({
       action: 'add',
-      name: 'MyServer',
-      host: 'fms.example.com',
+      name: 'dev',
+      host: 'example.com',
+      password: 'secret',
+      database: 'MyDB',
     });
 
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('--username is missing')
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('--username is also required to store credentials')
     );
-    expect(consoleErrorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('--database is missing')
-    );
+  });
+
+  // Edge case: no --password provided — no warning at all
+  it('does NOT warn when --password is not provided', async () => {
+    const cmd = new ServerCommand({
+      action: 'add',
+      name: 'dev',
+      host: 'example.com',
+    });
+
+    const result = await cmd.execute();
+
+    expect(result.success).toBe(true);
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
+  });
+
+  // Edge case: whitespace-only password is treated as no password
+  it('does NOT warn when --password is whitespace only', async () => {
+    const cmd = new ServerCommand({
+      action: 'add',
+      name: 'dev',
+      host: 'example.com',
+      password: '   ',
+    });
+
+    const result = await cmd.execute();
+
+    expect(result.success).toBe(true);
+    expect(consoleWarnSpy).not.toHaveBeenCalled();
   });
 });

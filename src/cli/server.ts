@@ -10,7 +10,6 @@ import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult, Server } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
-import { ExitCode } from '../api/errors';
 import { CredentialsCommand } from './credentials';
 
 export { CredentialsCommand };
@@ -93,10 +92,7 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
     } catch (e) {
       return {
         success: false,
-        error: this.output.formatError(
-          ExitCode.UNKNOWN_ERROR,
-          e instanceof Error ? e.message : 'Unknown error'
-        ),
+        error: e instanceof Error ? e.message : 'Unknown error',
       };
     }
   }
@@ -147,33 +143,37 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
     if (existing) {
       return {
         success: false,
-        error: this.output.formatError(
-          ExitCode.VALIDATION_ERROR,
-          `Server "${this.options.name}" already exists with ID: ${existing.id}`,
-          'Use --name with a unique name, or remove the existing server first.'
-        ),
+        error: `Server "${this.options.name}" already exists with ID: ${existing.id}. Use --name with a unique name, or remove the existing server first.`,
       };
     }
 
     // Add the server
     const server = manager.addServer({
-      id: this.options.serverId, // Use custom ID if provided
       name: this.options.name!,
       host: this.options.host!,
       port: this.options.port ?? 443,
       secure: this.options.secure ?? true,
     });
 
-    // Warn if --password is given without both --username and --database (T001)
+    // Warn if --password is given without both --username and --database (T010)
     if (this.options.password && this.options.password.trim()) {
-      if (!this.options.username || !this.options.username.trim()) {
-        console.error(
-          'Warning: --password was provided but --username is missing. Credentials will not be stored.'
+      const hasUsername = !!(this.options.username && this.options.username.trim());
+      const hasDatabase = !!(this.options.database && this.options.database.trim());
+
+      if (!hasUsername && !hasDatabase) {
+        // Neither username nor database provided
+        console.warn(
+          'Warning: credentials were not stored because --username and --database are also required'
         );
-      }
-      if (!this.options.database || !this.options.database.trim()) {
-        console.error(
-          'Warning: --password was provided but --database is missing. Credentials will not be stored.'
+      } else if (hasUsername && !hasDatabase) {
+        // Username provided but database missing
+        console.warn(
+          'Warning: --database is also required to store credentials'
+        );
+      } else if (!hasUsername && hasDatabase) {
+        // Database provided but username missing
+        console.warn(
+          'Warning: --username is also required to store credentials'
         );
       }
     }
@@ -199,22 +199,14 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
         if (!storedPassword) {
           return {
             success: false,
-            error: this.output.formatError(
-              ExitCode.GENERAL_ERROR,
-              'Failed to verify credential storage. Keychain may not be accessible.',
-              'Try using --password flag directly when running commands, or check keychain permissions.'
-            ),
+            error: 'Failed to verify credential storage. Keychain may not be accessible. Try using --password flag directly when running commands, or check keychain permissions.',
           };
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         return {
           success: false,
-          error: this.output.formatError(
-            ExitCode.GENERAL_ERROR,
-            `Failed to store credentials: ${errorMessage}`,
-            'Try using --password flag directly when running commands.'
-          ),
+          error: `Failed to store credentials: ${errorMessage}. Try using --password flag directly when running commands.`,
         };
       }
     }
@@ -267,11 +259,7 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
     if (!server) {
       return {
         success: false,
-        error: this.output.formatError(
-          ExitCode.NOT_FOUND,
-          `Server not found: ${serverId}`,
-          "Run 'fmodata server list --json' to see configured servers."
-        ),
+        error: `Server not found: ${serverId}. Run 'fmodata server list --json' to see configured servers.`,
       };
     }
 
@@ -281,10 +269,7 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
     if (!removed) {
       return {
         success: false,
-        error: this.output.formatError(
-          ExitCode.UNKNOWN_ERROR,
-          `Failed to remove server: ${serverId}`
-        ),
+        error: `Failed to remove server: ${serverId}`,
       };
     }
 
