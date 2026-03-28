@@ -180,6 +180,77 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Server credentials commands: fmo server credentials <add|list|remove>
+  const serverCmd = program.command('server').description('Manage server configurations');
+
+  const credentialsCmd = serverCmd
+    .command('credentials')
+    .description('Manage stored credentials for a server');
+
+  credentialsCmd
+    .command('add')
+    .description('Store credentials for a server')
+    .requiredOption('--server-id <id>', 'Server ID')
+    .requiredOption('--database <name>', 'Database name')
+    .requiredOption('--username <user>', 'Username')
+    .option('--password <pass>', 'Password (prompted if omitted)')
+    .action(async (options) => {
+      const { CredentialsCommand } = await import('./cli/credentials');
+      const globalOpts = program.opts();
+      const cmd = new CredentialsCommand({
+        action: 'add',
+        serverId: options.serverId,
+        database: options.database,
+        username: options.username,
+        password: options.password,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
+  credentialsCmd
+    .command('list')
+    .description('List stored credentials for a server')
+    .requiredOption('--server-id <id>', 'Server ID')
+    .action(async (options) => {
+      const { CredentialsCommand } = await import('./cli/credentials');
+      const globalOpts = program.opts();
+      const cmd = new CredentialsCommand({
+        action: 'list',
+        serverId: options.serverId,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
+  credentialsCmd
+    .command('remove')
+    .description('Remove stored credentials for a server')
+    .requiredOption('--server-id <id>', 'Server ID')
+    .requiredOption('--database <name>', 'Database name')
+    .requiredOption('--username <user>', 'Username')
+    .action(async (options) => {
+      const { CredentialsCommand } = await import('./cli/credentials');
+      const globalOpts = program.opts();
+      const cmd = new CredentialsCommand({
+        action: 'remove',
+        serverId: options.serverId,
+        database: options.database,
+        username: options.username,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
   return program;
 }
 
