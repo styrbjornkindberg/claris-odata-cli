@@ -13,6 +13,7 @@ import { BaseCommand, type CommandOptions } from './index';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { ODataClient } from '../api/client';
+import { c } from '../lib/theme';
 import type { CommandResult, CredentialEntry, BrowseAction } from '../types';
 
 /**
@@ -170,10 +171,10 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     const BACK = '__back__';
 
     const choice = await select<string>({
-      message: 'Select a database:',
+      message: `${c.label('Database')} ${c.muted(`(${databases.length})`)}`,
       choices: [
-        { name: '← Back', value: BACK },
-        ...databases.map((db) => ({ name: db, value: db })),
+        { name: c.muted('← Back'), value: BACK },
+        ...databases.map((db) => ({ name: `${c.resource.database(db)}`, value: db })),
       ],
     });
 
@@ -237,10 +238,10 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     const BACK = '__back__';
 
     const choice = await select<string>({
-      message: 'Select a table:',
+      message: `${c.label('Table')} ${c.muted(`(${tables.length})`)}`,
       choices: [
-        { name: '← Back', value: BACK },
-        ...tables.map((t) => ({ name: t, value: t })),
+        { name: c.muted('← Back'), value: BACK },
+        ...tables.map((t) => ({ name: `${c.resource.table(t)}`, value: t })),
       ],
     });
 
@@ -259,13 +260,13 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     const BACK = '__back__';
 
     const choice = await select<string>({
-      message: 'Select an action:',
+      message: c.label('Action'),
       choices: [
-        { name: '← Back', value: BACK },
-        { name: 'List Records', value: 'list-records' },
-        { name: 'Get Record by ID', value: 'get-record' },
-        { name: 'Create Record', value: 'create-record' },
-        { name: 'View Schema', value: 'view-schema' },
+        { name: c.muted('← Back'), value: BACK },
+        { name: `${c.info('List Records')}`, value: 'list-records' },
+        { name: `${c.success('Get Record by ID')}`, value: 'get-record' },
+        { name: `${c.mint('Create Record')}`, value: 'create-record' },
+        { name: `${c.sky('View Schema')}`, value: 'view-schema' },
       ],
     });
 
@@ -284,11 +285,11 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
    */
   async selectPostActionNavigation(): Promise<'tables' | 'databases' | 'exit'> {
     const choice = await select<string>({
-      message: 'What would you like to do next?',
+      message: c.muted('What would you like to do next?'),
       choices: [
-        { name: '← Back to tables', value: 'tables' },
-        { name: '← Back to databases', value: 'databases' },
-        { name: 'Exit', value: 'exit' },
+        { name: c.muted('← Back to tables'), value: 'tables' },
+        { name: c.muted('← Back to databases'), value: 'databases' },
+        { name: c.brand('Exit'), value: 'exit' },
       ],
     });
     return choice as 'tables' | 'databases' | 'exit';
@@ -387,8 +388,8 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
   async execute(): Promise<CommandResult> {
     if (!this.isInteractiveTTY()) {
       process.stderr.write(
-        'Error: browse command requires an interactive terminal (TTY).\n' +
-          'This command cannot be used in non-interactive mode (pipes, scripts, or CI).\n'
+        c.error('Error: browse command requires an interactive terminal (TTY).\n') +
+          c.muted('This command cannot be used in non-interactive mode (pipes, scripts, or CI).\n')
       );
       process.exit(1);
     }
@@ -398,8 +399,8 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
 
     if (servers.length === 0) {
       process.stdout.write(
-        'No servers configured.\n' +
-          'Use `fmo server add` to add a FileMaker server.\n'
+        c.warn('No servers configured.\n') +
+          c.muted('Use `fmo server add` to add a FileMaker server.\n')
       );
       return {
         success: true,
@@ -411,9 +412,9 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       const serverId = await select({
-        message: 'Select a server:',
+        message: `${c.label('Server')} ${c.muted(`(${servers.length})`)}`,
         choices: servers.map((server) => ({
-          name: `${server.name} (${server.id})`,
+          name: `${c.resource.server(server.name)} ${c.id(`(${server.id})`)}`,
           value: server.id,
         })),
       });
@@ -445,16 +446,16 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
             (err.message.includes('401') || err.message.includes('403') || err.message.toLowerCase().includes('auth'));
 
           if (isAuthError) {
-            process.stdout.write('Authentication failed. Please check your credentials.\n');
+            process.stdout.write(c.error('Authentication failed. Please check your credentials.\n'));
           } else {
-            process.stdout.write('Connection error: Could not reach the server.\n');
+            process.stdout.write(c.error('Connection error: Could not reach the server.\n'));
           }
 
           const action = await select({
-            message: 'What would you like to do?',
+            message: c.muted('What would you like to do?'),
             choices: [
-              { name: 'Retry', value: 'retry' },
-              { name: '← Back to server selection', value: 'back' },
+              { name: c.brand('Retry'), value: 'retry' },
+              { name: c.muted('← Back to server selection'), value: 'back' },
             ],
           });
 
@@ -463,11 +464,11 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
         }
 
         if (databases.length === 0) {
-          process.stdout.write('No databases found on this server.\n');
+          process.stdout.write(c.warn('No databases found on this server.\n'));
           const action = await select({
-            message: 'What would you like to do?',
+            message: c.muted('What would you like to do?'),
             choices: [
-              { name: '← Back to server selection', value: 'back' },
+              { name: c.muted('← Back to server selection'), value: 'back' },
             ],
           });
           void action; // always back
@@ -497,16 +498,16 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
               (err.message.includes('401') || err.message.includes('403') || err.message.toLowerCase().includes('auth'));
 
             if (isAuthError) {
-              process.stdout.write('Authentication failed. Please check your credentials.\n');
+              process.stdout.write(c.error('Authentication failed. Please check your credentials.\n'));
             } else {
-              process.stdout.write('Connection error: Could not reach the server.\n');
+              process.stdout.write(c.error('Connection error: Could not reach the server.\n'));
             }
 
             const action = await select({
-              message: 'What would you like to do?',
+              message: c.muted('What would you like to do?'),
               choices: [
-                { name: 'Retry', value: 'retry' },
-                { name: '← Back to database selection', value: 'back' },
+                { name: c.brand('Retry'), value: 'retry' },
+                { name: c.muted('← Back to database selection'), value: 'back' },
               ],
             });
 
@@ -515,11 +516,11 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
           }
 
           if (tables.length === 0) {
-            process.stdout.write('No tables found in this database.\n');
+            process.stdout.write(c.warn('No tables found in this database.\n'));
             const action = await select({
-              message: 'What would you like to do?',
+              message: c.muted('What would you like to do?'),
               choices: [
-                { name: '← Back to database selection', value: 'back' },
+                { name: c.muted('← Back to database selection'), value: 'back' },
               ],
             });
             void action; // always back
@@ -557,15 +558,15 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
               );
             } catch (err) {
               const message = err instanceof Error ? err.message : 'Unknown error';
-              process.stdout.write(`Action failed: ${message}\n`);
+              process.stdout.write(c.error(`Action failed: ${message}\n`));
               actionResult = { success: false, error: message };
             }
 
             if (actionResult.success && actionResult.data !== undefined) {
               const output = JSON.stringify(actionResult.data, null, 2);
-              process.stdout.write(`${output}\n`);
+              process.stdout.write(`${c.muted(output)}\n`);
             } else if (!actionResult.success) {
-              process.stdout.write(`Error: ${actionResult.error ?? 'Action failed'}\n`);
+              process.stdout.write(c.error(`Error: ${actionResult.error ?? 'Action failed'}\n`));
             }
 
             // Build the result to return if user chooses Exit
