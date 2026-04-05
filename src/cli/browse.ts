@@ -399,6 +399,9 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
    * Displays action menu after table selection and executes selected action.
    * Displays helpful message if no servers are configured.
    *
+   * If --server flag is provided, validates server exists and skips server selection.
+   * If --database flag is also provided, resolves credentials and skips database selection.
+   *
    * @returns Command result
    */
   async execute(): Promise<CommandResult> {
@@ -424,16 +427,47 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
       };
     }
 
+    // T022: Flag-based level skipping
+    // If --server provided, validate and skip server selection
+    let skipServerSelection = false;
+    let skipDatabaseSelection = false;
+
+    if (this.options.serverId) {
+      const serverExists = servers.some((s) => s.id === this.options.serverId);
+      if (!serverExists) {
+        process.stderr.write(
+          c.error(`Error: Server '${this.options.serverId}' not found.\n`) +
+            c.muted('Use `fmo server list` to see available servers.\n')
+        );
+        return { success: false, error: `Server '${this.options.serverId}' not found.` };
+      }
+      skipServerSelection = true;
+
+      // If --database is also provided, skip database selection too
+      if (this.options.database) {
+        skipDatabaseSelection = true;
+      }
+    }
+
     // Server selection loop (allows coming back from database selection)
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const serverId = await select({
-        message: `${c.label('Server')} ${c.muted(`(${servers.length})`)}`,
-        choices: servers.map((server) => ({
-          name: `${c.resource.server(server.name)} ${c.id(`(${server.id})`)}`,
-          value: server.id,
-        })),
-      });
+      let serverId: string;
+
+      if (skipServerSelection && this.options.serverId) {
+        // Use the provided server ID
+        serverId = this.options.serverId;
+        skipServerSelection = false; // Only skip once
+      } else {
+        // Prompt for server selection
+        serverId = await select({
+          message: `${c.label('Server')} ${c.muted(`(${servers.length})`)}`,
+          choices: servers.map((server) => ({
+            name: `${c.resource.server(server.name)} ${c.id(`(${server.id})`)}`,
+            value: server.id,
+          })),
+        });
+      }
 
       // Resolve credentials for the selected server (T013)
       let credentials: BrowseCredentials;
@@ -500,7 +534,23 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
           break; // back to server selection
         }
 
-        const selectedDatabase = await this.selectDatabase(databases);
+        let selectedDatabase: string | null;
+
+        if (skipDatabaseSelection && this.options.database) {
+          // Validate the provided database exists in the list
+          if (databases.includes(this.options.database)) {
+            selectedDatabase = this.options.database;
+          } else {
+            process.stderr.write(
+              c.error(`Error: Database '${this.options.database}' not found on server.\n`) +
+                c.muted('Available databases: ' + databases.join(', ') + '\n')
+            );
+            return { success: false, error: `Database '${this.options.database}' not found.` };
+          }
+          skipDatabaseSelection = false; // Only skip once
+        } else {
+          selectedDatabase = await this.selectDatabase(databases);
+        }
 
         if (selectedDatabase === null) {
           // User chose "Back" — return to server selection
