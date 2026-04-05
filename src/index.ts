@@ -10,11 +10,25 @@ import { Command } from 'commander';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { logger } from './utils/logger';
+import { c, box } from './lib/theme';
 import type { OutputFormat } from './types';
 
 // Load package.json for version
 const packageJsonPath = resolve(__dirname, '..', 'package.json');
 const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+
+/**
+ * Display ASCII header on CLI startup
+ */
+function showHeader(): void {
+  const header = box('Claris OData CLI', [
+    c.muted('FileMaker OData API Client'),
+    '',
+    c.muted('Version: ') + require('../package.json').version,
+    c.muted('Docs: https://help.claris.com/en/odata-guide/')
+  ]);
+  console.log(header);
+}
 
 /**
  * Create and configure the CLI program
@@ -258,6 +272,9 @@ function createProgram(): Command {
  * Main entry point
  */
 export async function main(): Promise<void> {
+  // Show ASCII header on startup
+  showHeader();
+  
   const program = createProgram();
   await program.parseAsync(process.argv);
 }

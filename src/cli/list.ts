@@ -9,6 +9,7 @@
 import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
+import { c } from '../lib/theme';
 
 /**
  * List command options
@@ -81,7 +82,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
     // This requires an authenticated connection to the server
     return {
       success: false,
-      error: 'Database listing not yet implemented',
+      error: c.error('Database listing not yet implemented'),
     };
   }
 
@@ -95,7 +96,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
     // This requires an authenticated connection to a specific database
     return {
       success: false,
-      error: 'Table listing not yet implemented',
+      error: c.error('Table listing not yet implemented'),
     };
   }
 }

@@ -7,6 +7,7 @@
  */
 
 import type { OutputFormat } from '../types';
+import { c } from '../lib/theme';
 
 /**
  * Table column definition
@@ -117,7 +118,7 @@ export class OutputFormatter {
     columns?: TableColumn[]
   ): string {
     if (data.length === 0) {
-      return 'No data';
+      return c.warn('No data');
     }
 
     // Get column definitions
@@ -130,7 +131,7 @@ export class OutputFormatter {
     const headerRow = cols.map((col, i) => this.pad(col.header, widths[i] ?? 0)).join('  ');
 
     // Create separator
-    const separator = cols.map((_, i) => '-'.repeat(widths[i] ?? 0)).join('  ');
+    const separator = cols.map((_, i) => c.muted('-'.repeat(widths[i] ?? 0))).join('  ');
 
     // Create data rows
     const dataRows = data.map((item) =>
@@ -142,7 +143,7 @@ export class OutputFormatter {
         .join('  ')
     );
 
-    return [headerRow, separator, ...dataRows].join('\n');
+    return [c.bold(headerRow), separator, ...dataRows].join('\n');
   }
 
   /**

@@ -17,6 +17,29 @@ import { c } from '../lib/theme';
 import type { CommandResult, CredentialEntry, BrowseAction } from '../types';
 
 /**
+ * Browse level state for the state machine
+ */
+enum BrowseLevel {
+  SERVER = 0,
+  DATABASE = 1,
+  TABLE = 2,
+  ACTION = 3,
+}
+
+/**
+ * State for the browse state machine
+ */
+interface BrowseState {
+  level: BrowseLevel;
+  serverId?: string;
+  database?: string;
+  table?: string;
+  credentials?: BrowseCredentials;
+  selectedServer?: { host: string; port?: number; secure?: boolean };
+  postActionNav?: 'tables' | 'databases' | 'exit' | null;
+}
+
+/**
  * Browse command options
  */
 export interface BrowseOptions extends CommandOptions {
