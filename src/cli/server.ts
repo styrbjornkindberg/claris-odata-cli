@@ -11,6 +11,7 @@ import type { CommandResult, Server } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { CredentialsCommand } from './credentials';
+import { logger } from '../utils/logger';
 
 export { CredentialsCommand };
 

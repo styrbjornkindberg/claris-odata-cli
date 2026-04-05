@@ -51,14 +51,15 @@ vi.mock('../../../src/config/credentials', () => ({
 }));
 
 describe('ServerCommand - server add incomplete-credential warnings (T010)', () => {
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
+  let loggerWarnSpy: ReturnType<typeof vi.spyOn>;
 
-  beforeEach(() => {
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  beforeEach(async () => {
+    const logger = await import('../../../src/utils/logger');
+    loggerWarnSpy = vi.spyOn(logger.logger, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleWarnSpy.mockRestore();
+    loggerWarnSpy.mockRestore();
   });
 
   // Acceptance Scenario 1: --password without --username (and no --database)
@@ -73,8 +74,8 @@ describe('ServerCommand - server add incomplete-credential warnings (T010)', () 
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
+    expect(loggerWarnSpy).toHaveBeenCalledTimes(1);
+    expect(loggerWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('credentials were not stored because --username and --database are also required')
     );
   });
@@ -92,8 +93,8 @@ describe('ServerCommand - server add incomplete-credential warnings (T010)', () 
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
+    expect(loggerWarnSpy).toHaveBeenCalledTimes(1);
+    expect(loggerWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('--database is also required to store credentials')
     );
   });
@@ -112,7 +113,7 @@ describe('ServerCommand - server add incomplete-credential warnings (T010)', () 
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleWarnSpy).not.toHaveBeenCalled();
+    expect(loggerWarnSpy).not.toHaveBeenCalled();
   });
 
   // Edge case: --password + --database but no --username
@@ -128,8 +129,8 @@ describe('ServerCommand - server add incomplete-credential warnings (T010)', () 
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
+    expect(loggerWarnSpy).toHaveBeenCalledTimes(1);
+    expect(loggerWarnSpy).toHaveBeenCalledWith(
       expect.stringContaining('--username is also required to store credentials')
     );
   });
@@ -145,7 +146,7 @@ describe('ServerCommand - server add incomplete-credential warnings (T010)', () 
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleWarnSpy).not.toHaveBeenCalled();
+    expect(loggerWarnSpy).not.toHaveBeenCalled();
   });
 
   // Edge case: whitespace-only password is treated as no password
@@ -160,6 +161,6 @@ describe('ServerCommand - server add incomplete-credential warnings (T010)', () 
     const result = await cmd.execute();
 
     expect(result.success).toBe(true);
-    expect(consoleWarnSpy).not.toHaveBeenCalled();
+    expect(loggerWarnSpy).not.toHaveBeenCalled();
   });
 });
