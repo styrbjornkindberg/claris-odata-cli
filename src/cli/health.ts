@@ -11,6 +11,7 @@ import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { logger } from '../utils/logger';
 import { c } from '../lib/theme';
+import { OutputFormatter } from '../output/formatter';
 import type { OutputFormat } from '../types';
 
 export interface HealthOptions {
@@ -42,10 +43,12 @@ export interface HealthResult {
 export class HealthCommand {
   private serverManager: ServerManager;
   private credentialsManager: CredentialsManager;
+  private formatter: OutputFormatter;
 
   constructor(private options: HealthOptions) {
     this.serverManager = new ServerManager();
     this.credentialsManager = new CredentialsManager();
+    this.formatter = new OutputFormatter(options.output ?? 'table');
   }
 
   /**
@@ -199,10 +202,20 @@ export class HealthCommand {
   }
 
   /**
-   * Format as JSON
+   * Format as JSONL (one server per line)
    */
-  formatJson(result: HealthResult): string {
-    return JSON.stringify(result, null, 2);
+  formatJsonl(result: HealthResult): string {
+    // Convert ServerHealth objects to plain records for JSONL
+    const servers = result.servers.map(s => ({
+      id: s.id,
+      name: s.name,
+      host: s.host,
+      port: s.port,
+      status: s.status,
+      latency: s.latency,
+      error: s.error,
+    }));
+    return this.formatter.formatJsonl(servers);
   }
 
   /**
@@ -211,11 +224,32 @@ export class HealthCommand {
   async run(): Promise<number> {
     try {
       const result = await this.execute();
+      const format = this.options.output ?? 'table';
       
-      if (this.options.output === 'json') {
-        console.log(this.formatJson(result));
-      } else {
-        console.log(this.formatOutput(result));
+      switch (format) {
+        case 'json':
+          console.log(this.formatter.formatJson(result));
+          break;
+        case 'jsonl':
+          console.log(this.formatJsonl(result));
+          break;
+        case 'csv':
+          // Convert ServerHealth objects to plain records for CSV
+          const csvServers = result.servers.map(s => ({
+            id: s.id,
+            name: s.name,
+            host: s.host,
+            port: s.port,
+            status: s.status,
+            latency: s.latency ?? '',
+            error: s.error ?? '',
+          }));
+          console.log(this.formatter.formatCsv(csvServers));
+          break;
+        case 'table':
+        default:
+          console.log(this.formatOutput(result));
+          break;
       }
 
       // Exit with error code if any servers are unhealthy

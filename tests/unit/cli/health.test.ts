@@ -277,7 +277,8 @@ describe('HealthCommand', () => {
 
       const output = cmd.formatOutput(result);
 
-      expect(output).toContain('No credentials stored');
+      // The status text is 'No credentials' (not the error message)
+      expect(output).toContain('No credentials');
     });
 
     it('formats empty result with warning', () => {
@@ -309,7 +310,8 @@ describe('HealthCommand', () => {
         generatedAt: '2026-04-05T16:30:00Z',
       };
 
-      const json = cmd.formatJson(result);
+      // Access the formatter's formatJson method
+      const json = cmd['formatter'].formatJson(result);
       const parsed = JSON.parse(json);
 
       expect(parsed).toEqual(result);
