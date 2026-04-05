@@ -9,8 +9,10 @@
 import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
+import { CredentialsManager } from '../config/credentials';
 import { OutputFormatter } from '../output/formatter';
 import { c } from '../lib/theme';
+import axios from 'axios';
 
 /**
  * List command options
@@ -89,12 +91,108 @@ export class ListCommand extends BaseCommand<ListOptions> {
    * @returns Command result with list of databases
    */
   private async listDatabases(): Promise<CommandResult> {
-    // TODO: Implement database listing via OData API
-    // This requires an authenticated connection to the server
-    return {
-      success: false,
-      error: c.error('Database listing not yet implemented'),
-    };
+    if (!this.options.serverId) {
+      return {
+        success: false,
+        error: 'Server ID is required to list databases. Use --server <id>',
+      };
+    }
+
+    const serverManager = new ServerManager();
+    const server = serverManager.getServer(this.options.serverId);
+    
+    if (!server) {
+      return {
+        success: false,
+        error: `Server not found: ${this.options.serverId}`,
+      };
+    }
+
+    try {
+      // Get credentials
+      const credentialsManager = new CredentialsManager();
+      const credentials = await credentialsManager.listCredentials(this.options.serverId);
+      
+      if (!credentials || credentials.length === 0) {
+        return {
+          success: false,
+          error: 'No credentials stored for this server. Use `fmo server credentials add` first.',
+        };
+      }
+
+      // Use first credential
+      const cred = credentials[0];
+      const password = await credentialsManager.getCredentials(
+        this.options.serverId,
+        cred.database,
+        cred.username
+      );
+
+      if (!password) {
+        return {
+          success: false,
+          error: 'Credentials stored but password not found.',
+        };
+      }
+
+      // Get databases from server
+      const protocol = server.port === 443 ? 'https' : 'http';
+      const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}/fmi/odata/v4`;
+      const authToken = Buffer.from(`${cred.username}:${password}`).toString('base64');
+
+      const response = await axios.get(`${baseUrl}/`, {
+        headers: { Authorization: `Basic ${authToken}` },
+        timeout: 10000,
+      });
+
+      // Parse the service document response
+      // FileMaker OData returns a list of databases in the service document
+      const data = response.data;
+      const databases = data.value?.map((db: any) => ({
+        name: db.name,
+        kind: db.kind,
+        url: db.url,
+      })) ?? [];
+
+      return {
+        success: true,
+        data: {
+          type: 'databases',
+          server: this.options.serverId,
+          databases,
+        },
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: this.formatError(error),
+      };
+    }
+  }
+
+  /**
+   * Format error message
+   */
+  private formatError(error: any): string {
+    if (error.code === 'ECONNREFUSED') {
+      return 'Connection refused';
+    }
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      return 'Connection timeout';
+    }
+    if (error.code === 'ENOTFOUND') {
+      return 'Host not found';
+    }
+    if (error.response?.status === 401) {
+      return 'Authentication failed';
+    }
+    if (error.response?.status === 404) {
+      return 'Server not found';
+    }
+    if (error.response?.status === 500) {
+      return 'Server error';
+    }
+    return error.message ?? 'Unknown error';
   }
 
   /**
