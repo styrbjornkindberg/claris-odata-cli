@@ -121,6 +121,22 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
   }
 
   /**
+   * Prompt the user for new credentials without checking keychain.
+   *
+   * Used when the user chooses to re-enter credentials after an auth failure.
+   *
+   * @param serverId - The selected server ID
+   * @returns Resolved credentials (database, username, password)
+   */
+  async promptCredentials(serverId: string): Promise<BrowseCredentials> {
+    const database = await input({ message: 'Database:' });
+    const username = await input({ message: 'Username:' });
+    const resolvedPassword = await password({ message: 'Password:' });
+
+    return { serverId, database, username, password: resolvedPassword };
+  }
+
+  /**
    * Fetch the list of available databases from a FileMaker server.
    *
    * Calls the OData service document endpoint at /fmi/odata/v4, which
@@ -453,14 +469,23 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
 
           const action = await select({
             message: c.muted('What would you like to do?'),
-            choices: [
-              { name: c.brand('Retry'), value: 'retry' },
-              { name: c.muted('← Back to server selection'), value: 'back' },
-            ],
+            choices: isAuthError
+              ? [
+                  { name: c.brand('Re-enter credentials'), value: 'reauth' },
+                  { name: c.muted('← Back to server selection'), value: 'back' },
+                ]
+              : [
+                  { name: c.brand('Retry'), value: 'retry' },
+                  { name: c.muted('← Back to server selection'), value: 'back' },
+                ],
           });
 
           if (action === 'back') break; // back to server selection
-          continue; // retry fetchDatabases
+          if (action === 'reauth') {
+            // Prompt for new credentials
+            credentials = await this.promptCredentials(serverId);
+          }
+          continue; // retry fetchDatabases (with new credentials if reauth)
         }
 
         if (databases.length === 0) {
@@ -505,14 +530,23 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
 
             const action = await select({
               message: c.muted('What would you like to do?'),
-              choices: [
-                { name: c.brand('Retry'), value: 'retry' },
-                { name: c.muted('← Back to database selection'), value: 'back' },
-              ],
+              choices: isAuthError
+                ? [
+                    { name: c.brand('Re-enter credentials'), value: 'reauth' },
+                    { name: c.muted('← Back to database selection'), value: 'back' },
+                  ]
+                : [
+                    { name: c.brand('Retry'), value: 'retry' },
+                    { name: c.muted('← Back to database selection'), value: 'back' },
+                  ],
             });
 
             if (action === 'back') break; // back to database selection
-            continue; // retry fetchTables
+            if (action === 'reauth') {
+              // Prompt for new credentials
+              credentials = await this.promptCredentials(serverId);
+            }
+            continue; // retry fetchTables (with new credentials if reauth)
           }
 
           if (tables.length === 0) {
