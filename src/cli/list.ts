@@ -9,6 +9,7 @@
 import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
+import { OutputFormatter } from '../output/formatter';
 import { c } from '../lib/theme';
 
 /**
@@ -27,6 +28,13 @@ export interface ListOptions extends CommandOptions {
  * Lists configured servers or resources from a FileMaker server.
  */
 export class ListCommand extends BaseCommand<ListOptions> {
+  private formatter: OutputFormatter;
+
+  constructor(options: ListOptions) {
+    super(options);
+    this.formatter = new OutputFormatter(options.output ?? 'table');
+  }
+
   /**
    * Execute the list command
    *
@@ -62,13 +70,16 @@ export class ListCommand extends BaseCommand<ListOptions> {
 
     return {
       success: true,
-      data: servers.map((s) => ({
-        id: s.id,
-        name: s.name,
-        host: s.host,
-        port: s.port ?? 443,
-        secure: s.secure ?? true,
-      })),
+      data: {
+        type: 'servers',
+        servers: servers.map((s) => ({
+          id: s.id,
+          name: s.name,
+          host: s.host,
+          port: s.port ?? 443,
+          secure: s.secure ?? true,
+        })),
+      },
     };
   }
 
@@ -98,5 +109,29 @@ export class ListCommand extends BaseCommand<ListOptions> {
       success: false,
       error: c.error('Table listing not yet implemented'),
     };
+  }
+
+  /**
+   * Format output for display
+   *
+   * @param result - Command result
+   * @returns Formatted string
+   */
+  formatOutput(result: CommandResult): string {
+    if (!result.success) {
+      return this.formatter.formatJson({
+        type: 'error',
+        code: 'ODATA_QUERY_FAILED',
+        message: result.error,
+      });
+    }
+
+    // For JSONL format, output one record per line
+    if (this.options.output === 'jsonl' && result.data && Array.isArray((result.data as any).servers)) {
+      return this.formatter.formatJsonl((result.data as any).servers);
+    }
+
+    // For JSON or table format
+    return this.formatter.formatJson(result.data);
   }
 }
