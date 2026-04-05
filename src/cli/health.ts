@@ -6,11 +6,11 @@
  * @module cli/health
  */
 
+import axios from 'axios';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
-import { ODataClient } from '../api/client';
 import { logger } from '../utils/logger';
-import { c, box } from '../lib/theme';
+import { c } from '../lib/theme';
 import type { OutputFormat } from '../types';
 
 export interface HealthOptions {
@@ -75,18 +75,18 @@ export class HealthCommand {
   /**
    * Check connectivity for a single server
    */
-  private async checkServer(server: { id: string; name: string; host: string; port: number }): Promise<ServerHealth> {
+  private async checkServer(server: { id: string; name: string; host: string; port?: number }): Promise<ServerHealth> {
     const health: ServerHealth = {
       id: server.id,
       name: server.name,
       host: server.host,
-      port: server.port,
+      port: server.port ?? 443,
       status: 'ok',
     };
 
     try {
       // Get credentials for this server
-      const credentials = this.credentialsManager.getCredentials(server.id);
+      const credentials = await this.credentialsManager.listCredentials(server.id);
       
       if (!credentials || credentials.length === 0) {
         health.status = 'no-credentials';
@@ -96,21 +96,29 @@ export class HealthCommand {
 
       // Use first credential to test connectivity
       const cred = credentials[0];
+      const storedPassword = await this.credentialsManager.getCredentials(
+        server.id,
+        cred.database,
+        cred.username
+      );
       
-      // Create client and test connection
-      const protocol = server.port === 443 ? 'https' : 'http';
-      const baseUrl = `${protocol}://${server.host}:${server.port}/fmi/odata/v4`;
+      if (!storedPassword) {
+        health.status = 'no-credentials';
+        health.error = 'Credentials stored but password not found';
+        return health;
+      }
+      
+      // Test connectivity with a simple HTTP request
+      const protocol = health.port === 443 ? 'https' : 'http';
+      const baseUrl = `${protocol}://${server.host}:${health.port}/fmi/odata/v4`;
+      const authToken = Buffer.from(`${cred.username}:${storedPassword}`).toString('base64');
 
-      const client = new ODataClient({
-        baseUrl,
-        database: cred.database,
-        authToken: Buffer.from(`${cred.username}:${cred.password}`).toString('base64'),
-        timeout: 5000, // 5 second timeout for health check
-      });
-
-      // Test connectivity by listing databases (lightweight operation)
+      // Test connectivity by hitting the root endpoint
       const start = Date.now();
-      await client.get('/');
+      await axios.get(`${baseUrl}/`, {
+        headers: { Authorization: `Basic ${authToken}` },
+        timeout: 5000,
+      });
       health.latency = Date.now() - start;
 
     } catch (error: any) {

@@ -13,6 +13,7 @@ import { BaseCommand, type CommandOptions } from './index';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { ODataClient } from '../api/client';
+import { OutputFormatter } from '../output/formatter';
 import { c } from '../lib/theme';
 import type { CommandResult, CredentialEntry, BrowseAction } from '../types';
 
@@ -657,8 +658,11 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
               actionResult = { success: false, error: message };
             }
 
+            // Use OutputFormatter for structured output
+            const formatter = new OutputFormatter(this.options.output ?? 'table');
+            
             if (actionResult.success && actionResult.data !== undefined) {
-              const output = JSON.stringify(actionResult.data, null, 2);
+              const output = formatter.formatJson(actionResult.data);
               process.stdout.write(`${c.muted(output)}\n`);
             } else if (!actionResult.success) {
               process.stdout.write(c.error(`Error: ${actionResult.error ?? 'Action failed'}\n`));

@@ -20,22 +20,18 @@ vi.mock('../../../src/api/client');
 describe('HealthCommand', () => {
   let mockServerManager: any;
   let mockCredentialsManager: any;
-  let mockODataClient: any;
 
   beforeEach(() => {
     mockServerManager = {
       listServers: vi.fn(),
     };
     mockCredentialsManager = {
+      listCredentials: vi.fn(),
       getCredentials: vi.fn(),
-    };
-    mockODataClient = {
-      get: vi.fn(),
     };
 
     vi.mocked(ServerManager).mockImplementation(() => mockServerManager);
     vi.mocked(CredentialsManager).mockImplementation(() => mockCredentialsManager);
-    vi.mocked(ODataClient).mockImplementation(() => mockODataClient);
   });
 
   afterEach(() => {
@@ -49,10 +45,16 @@ describe('HealthCommand', () => {
         { id: 'server-1', name: 'Production', host: 'fm.example.com', port: 443 },
         { id: 'server-2', name: 'Development', host: 'dev.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 'server-1', database: 'TestDB', username: 'admin' },
+        { serverId: 'server-2', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockResolvedValue({ data: {} });
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+
+      // Mock axios
+      vi.mock('axios', () => ({
+        default: { get: vi.fn().mockResolvedValue({ data: {} }) }
+      }));
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });
@@ -72,7 +74,7 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 'server-1', name: 'Production', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([]);
+      mockCredentialsManager.listCredentials.mockResolvedValue([]);
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });

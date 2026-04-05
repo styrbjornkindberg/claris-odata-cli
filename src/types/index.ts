@@ -138,7 +138,7 @@ export interface ODataErrorDetail {
 /**
  * Output format options for CLI
  */
-export type OutputFormat = 'json' | 'table' | 'csv';
+export type OutputFormat = 'json' | 'jsonl' | 'table' | 'csv';
 
 /**
  * Command action result
