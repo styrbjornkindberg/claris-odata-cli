@@ -224,7 +224,7 @@ function createProgram(): Command {
   program
     .command('health')
     .description('Check API connectivity for configured servers')
-    .action(async (options) => {
+    .action(async () => {
       const { HealthCommand } = await import('./cli/health');
       const globalOpts = program.opts();
       const cmd = new HealthCommand({

@@ -7,7 +7,12 @@
  */
 
 import { BaseCommand, type CommandOptions } from './index';
-import type { CommandResult } from '../types';
+import { ODataClient } from '../api/client';
+import { AuthManager } from '../api/auth';
+import { ServerManager } from '../config/servers';
+import { CredentialsManager } from '../config/credentials';
+import { OutputFormatter } from '../output/formatter';
+import type { CommandResult, QueryOptions } from '../types';
 
 /**
  * Get command options
@@ -37,19 +42,111 @@ export interface GetOptions extends CommandOptions {
  * Get command implementation
  *
  * Retrieves records from a FileMaker table using OData query options.
+ * Supports JSONL output for streaming large result sets.
  */
 export class GetCommand extends BaseCommand<GetOptions> {
+  private formatter: OutputFormatter;
+
+  constructor(options: GetOptions) {
+    super(options);
+    this.formatter = new OutputFormatter(options.output ?? 'table');
+  }
+
   /**
    * Execute the get command
    *
    * @returns Command result with records
    */
   async execute(): Promise<CommandResult> {
-    // TODO: Implement actual API call
-    // Query options available: filter, select, top, skip, orderby, count
-    return {
-      success: false,
-      error: 'Get command not yet implemented',
-    };
+    try {
+      // Get server configuration
+      const serverManager = new ServerManager();
+      const server = serverManager.getServer(this.options.serverId);
+      
+      if (!server) {
+        return {
+          success: false,
+          error: `Server not found: ${this.options.serverId}`,
+        };
+      }
+
+      // Get credentials
+      const credentialsManager = new CredentialsManager();
+      const credentials = await credentialsManager.getCredentials(
+        this.options.serverId,
+        this.options.database,
+        this.options.serverId // Using serverId as username placeholder
+      );
+
+      if (!credentials) {
+        return {
+          success: false,
+          error: 'No credentials found for this server/database',
+        };
+      }
+
+      // Build OData client
+      const protocol = server.secure ?? true ? 'https' : 'http';
+      const port = server.port ?? 443;
+      const baseUrl = `${protocol}://${server.host}:${port}/fmi/odata/v4`;
+      
+      const authManager = new AuthManager();
+      const authToken = authManager.createBasicAuthToken(
+        this.options.serverId, // Placeholder
+        credentials
+      );
+
+      const client = new ODataClient({
+        baseUrl,
+        database: this.options.database,
+        authToken,
+      });
+
+      // Build query options
+      const queryOptions: QueryOptions = {};
+      if (this.options.filter) queryOptions.filter = this.options.filter;
+      if (this.options.select) queryOptions.select = this.options.select;
+      if (this.options.top !== undefined) queryOptions.top = this.options.top;
+      if (this.options.skip !== undefined) queryOptions.skip = this.options.skip;
+      if (this.options.orderby) queryOptions.orderby = this.options.orderby;
+      if (this.options.count) queryOptions.count = true;
+
+      // Execute query
+      const records = await client.getRecords(this.options.table, queryOptions);
+
+      return {
+        success: true,
+        data: records,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.message ?? 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Format output for display
+   *
+   * @param result - Command result
+   * @returns Formatted string
+   */
+  formatOutput(result: CommandResult): string {
+    if (!result.success) {
+      return this.formatter.formatJson({
+        type: 'error',
+        code: 'ODATA_QUERY_FAILED',
+        message: result.error,
+      });
+    }
+
+    // For JSONL format, output one record per line
+    if (this.options.output === 'jsonl' && Array.isArray(result.data)) {
+      return this.formatter.formatJsonl(result.data);
+    }
+
+    // For JSON or table format
+    return this.formatter.formatJson(result.data);
   }
 }
