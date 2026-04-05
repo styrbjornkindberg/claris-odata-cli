@@ -25,7 +25,7 @@ function showHeader(): void {
     c.muted('FileMaker OData API Client'),
     '',
     c.muted('Version: ') + require('../package.json').version,
-    c.muted('Docs: https://help.claris.com/en/odata-guide/')
+    c.muted('Docs: https://help.claris.com/en/odata-guide/'),
   ]);
   console.log(header);
 }
@@ -319,7 +319,7 @@ function createProgram(): Command {
 export async function main(): Promise<void> {
   // Show ASCII header on startup
   showHeader();
-  
+
   const program = createProgram();
   await program.parseAsync(process.argv);
 }

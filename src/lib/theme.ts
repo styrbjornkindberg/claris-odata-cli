@@ -9,12 +9,12 @@ import chalk from 'chalk';
 // ─── Brand Colors ─────────────────────────────────────────────────────────────
 // Claris/FileMaker blue theme + complementary palette
 
-const brand = chalk.hex('#0066CC');     // Claris blue (primary)
-const accent = chalk.hex('#FF6B6B');    // Coral red (destructive/attention)
-const mint = chalk.hex('#4ECDC4');      // Teal mint (success/create)
-const gold = chalk.hex('#FFD93D');      // Gold (warning/caution)
-const slate = chalk.hex('#6C7A89');     // Slate (muted/secondary text)
-const sky = chalk.hex('#74B9FF');       // Sky blue (info/links)
+const brand = chalk.hex('#0066CC'); // Claris blue (primary)
+const accent = chalk.hex('#FF6B6B'); // Coral red (destructive/attention)
+const mint = chalk.hex('#4ECDC4'); // Teal mint (success/create)
+const gold = chalk.hex('#FFD93D'); // Gold (warning/caution)
+const slate = chalk.hex('#6C7A89'); // Slate (muted/secondary text)
+const sky = chalk.hex('#74B9FF'); // Sky blue (info/links)
 
 // ─── Semantic Formatters ──────────────────────────────────────────────────────
 
@@ -123,8 +123,8 @@ export function kv(key: string, value: string): string {
  * Format a table header row.
  */
 export function tableHeader(...cols: { label: string; width: number }[]): string {
-  const header = cols.map(col => padEnd(c.header(col.label), col.width)).join('  ');
-  const rule = cols.map(col => slate('─'.repeat(col.width))).join('  ');
+  const header = cols.map((col) => padEnd(c.header(col.label), col.width)).join('  ');
+  const rule = cols.map((col) => slate('─'.repeat(col.width))).join('  ');
   return `${header}\n${rule}`;
 }
 
@@ -132,20 +132,21 @@ export function tableHeader(...cols: { label: string; width: number }[]): string
  * Format a table row.
  */
 export function tableRow(...cells: { text: string; width: number }[]): string {
-  return cells.map(cell => padEnd(cell.text, cell.width)).join('  ');
+  return cells.map((cell) => padEnd(cell.text, cell.width)).join('  ');
 }
 
 /**
  * Box a message with a border.
  */
 export function box(title: string, lines: string[]): string {
-  const maxLen = Math.max(title.length, ...lines.map(l => stripAnsi(l).length));
+  const maxLen = Math.max(title.length, ...lines.map((l) => stripAnsi(l).length));
   const width = maxLen + 4;
   const top = brand('╭' + '─'.repeat(width - 2) + '╮');
   const bot = brand('╰' + '─'.repeat(width - 2) + '╯');
-  const titleLine = brand('│') + ' ' + c.bold(title) + ' '.repeat(width - 3 - title.length) + brand('│');
+  const titleLine =
+    brand('│') + ' ' + c.bold(title) + ' '.repeat(width - 3 - title.length) + brand('│');
   const sep = brand('├' + '─'.repeat(width - 2) + '┤');
-  const body = lines.map(l => {
+  const body = lines.map((l) => {
     const vis = stripAnsi(l).length;
     return brand('│') + ' ' + l + ' '.repeat(Math.max(0, width - 3 - vis)) + brand('│');
   });

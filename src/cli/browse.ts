@@ -92,7 +92,11 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
       const entry = storedCredentials[0];
       let resolvedPassword: string;
       try {
-        const retrieved = await manager.getCredentials(entry.serverId, entry.database, entry.username);
+        const retrieved = await manager.getCredentials(
+          entry.serverId,
+          entry.database,
+          entry.username
+        );
         resolvedPassword = retrieved ?? '';
       } catch {
         resolvedPassword = '';
@@ -155,7 +159,9 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
 
-    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
+    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString(
+      'base64'
+    );
 
     const response = await axios.get<ODataServiceDocument>(`${baseUrl}/fmi/odata/v4`, {
       headers: {
@@ -169,7 +175,9 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
 
     const entries = response.data?.value ?? [];
     return entries
-      .filter((e) => e.kind === 'EntityContainer' || e.kind === undefined || e.kind !== 'FunctionImport')
+      .filter(
+        (e) => e.kind === 'EntityContainer' || e.kind === undefined || e.kind !== 'FunctionImport'
+      )
       .map((e) => e.name)
       .filter(Boolean);
   }
@@ -219,7 +227,9 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
 
-    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
+    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString(
+      'base64'
+    );
 
     const response = await axios.get<ODataServiceDocument>(
       `${baseUrl}/fmi/odata/v4/${encodeURIComponent(database)}`,
@@ -486,17 +496,18 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
       while (true) {
         let databases: string[];
         try {
-          databases = await this.fetchDatabases(
-            selectedServer ?? { host: serverId },
-            credentials
-          );
+          databases = await this.fetchDatabases(selectedServer ?? { host: serverId }, credentials);
         } catch (err) {
           const isAuthError =
             err instanceof Error &&
-            (err.message.includes('401') || err.message.includes('403') || err.message.toLowerCase().includes('auth'));
+            (err.message.includes('401') ||
+              err.message.includes('403') ||
+              err.message.toLowerCase().includes('auth'));
 
           if (isAuthError) {
-            process.stdout.write(c.error('Authentication failed. Please check your credentials.\n'));
+            process.stdout.write(
+              c.error('Authentication failed. Please check your credentials.\n')
+            );
           } else {
             process.stdout.write(c.error('Connection error: Could not reach the server.\n'));
           }
@@ -526,9 +537,7 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
           process.stdout.write(c.warn('No databases found on this server.\n'));
           const action = await select({
             message: c.muted('What would you like to do?'),
-            choices: [
-              { name: c.muted('← Back to server selection'), value: 'back' },
-            ],
+            choices: [{ name: c.muted('← Back to server selection'), value: 'back' }],
           });
           void action; // always back
           break; // back to server selection
@@ -570,10 +579,14 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
           } catch (err) {
             const isAuthError =
               err instanceof Error &&
-              (err.message.includes('401') || err.message.includes('403') || err.message.toLowerCase().includes('auth'));
+              (err.message.includes('401') ||
+                err.message.includes('403') ||
+                err.message.toLowerCase().includes('auth'));
 
             if (isAuthError) {
-              process.stdout.write(c.error('Authentication failed. Please check your credentials.\n'));
+              process.stdout.write(
+                c.error('Authentication failed. Please check your credentials.\n')
+              );
             } else {
               process.stdout.write(c.error('Connection error: Could not reach the server.\n'));
             }
@@ -603,9 +616,7 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
             process.stdout.write(c.warn('No tables found in this database.\n'));
             const action = await select({
               message: c.muted('What would you like to do?'),
-              choices: [
-                { name: c.muted('← Back to database selection'), value: 'back' },
-              ],
+              choices: [{ name: c.muted('← Back to database selection'), value: 'back' }],
             });
             void action; // always back
             break; // back to database selection

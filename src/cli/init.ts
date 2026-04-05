@@ -87,7 +87,8 @@ export class InitCommand extends BaseCommand<InitOptions> {
     if (!this.options.refresh && existsSync(this.contextFile)) {
       return {
         success: false,
-        error: `${c.error('Context file already exists:')} ${this.contextFile}\n` +
+        error:
+          `${c.error('Context file already exists:')} ${this.contextFile}\n` +
           c.muted('Use --refresh to update.'),
       };
     }
@@ -99,7 +100,8 @@ export class InitCommand extends BaseCommand<InitOptions> {
     if (servers.length === 0) {
       return {
         success: false,
-        error: `${c.error('No servers configured.')}\n` +
+        error:
+          `${c.error('No servers configured.')}\n` +
           c.muted('Use `fmo server add` to add a FileMaker server.'),
       };
     }
@@ -205,7 +207,9 @@ export class InitCommand extends BaseCommand<InitOptions> {
    * @param serverId - Server ID
    * @returns Credentials or null
    */
-  private async resolveCredentials(serverId: string): Promise<{ username: string; password: string } | null> {
+  private async resolveCredentials(
+    serverId: string
+  ): Promise<{ username: string; password: string } | null> {
     const manager = new CredentialsManager();
 
     let storedCredentials: CredentialEntry[] = [];
@@ -246,7 +250,9 @@ export class InitCommand extends BaseCommand<InitOptions> {
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
 
-    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
+    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString(
+      'base64'
+    );
 
     try {
       const response = await axios.get<ODataServiceDocument>(`${baseUrl}/fmi/odata/v4`, {
@@ -261,7 +267,10 @@ export class InitCommand extends BaseCommand<InitOptions> {
 
       const entries = response.data?.value ?? [];
       return entries
-        .filter((e: { kind?: string; name?: string }) => e.kind === 'EntityContainer' || e.kind === undefined || e.kind !== 'FunctionImport')
+        .filter(
+          (e: { kind?: string; name?: string }) =>
+            e.kind === 'EntityContainer' || e.kind === undefined || e.kind !== 'FunctionImport'
+        )
         .map((e: { name?: string }) => e.name)
         .filter(Boolean) as string[];
     } catch {
@@ -286,7 +295,9 @@ export class InitCommand extends BaseCommand<InitOptions> {
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
 
-    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64');
+    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString(
+      'base64'
+    );
 
     try {
       const response = await axios.get<ODataServiceDocument>(

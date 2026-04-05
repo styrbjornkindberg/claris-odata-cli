@@ -162,19 +162,15 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
 
       if (!hasUsername && !hasDatabase) {
         // Neither username nor database provided
-        console.warn(
+        logger.warn(
           'Warning: credentials were not stored because --username and --database are also required'
         );
       } else if (hasUsername && !hasDatabase) {
         // Username provided but database missing
-        console.warn(
-          'Warning: --database is also required to store credentials'
-        );
+        logger.warn('Warning: --database is also required to store credentials');
       } else if (!hasUsername && hasDatabase) {
         // Database provided but username missing
-        console.warn(
-          'Warning: --username is also required to store credentials'
-        );
+        logger.warn('Warning: --username is also required to store credentials');
       }
     }
 
@@ -199,7 +195,8 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
         if (!storedPassword) {
           return {
             success: false,
-            error: 'Failed to verify credential storage. Keychain may not be accessible. Try using --password flag directly when running commands, or check keychain permissions.',
+            error:
+              'Failed to verify credential storage. Keychain may not be accessible. Try using --password flag directly when running commands, or check keychain permissions.',
           };
         }
       } catch (err) {
@@ -308,7 +305,13 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
 
       const lines: string[] = ['Configured servers:', ''];
       for (const server of data) {
-        const s = server as { id: string; name: string; host: string; port: number; secure: string };
+        const s = server as {
+          id: string;
+          name: string;
+          host: string;
+          port: number;
+          secure: string;
+        };
         lines.push(`  ${s.name}`);
         lines.push(`    ID: ${s.id}`);
         lines.push(`    URL: ${s.secure}://${s.host}:${s.port}`);
