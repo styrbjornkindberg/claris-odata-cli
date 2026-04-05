@@ -220,6 +220,25 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Browse command
+  program
+    .command('browse')
+    .description('Interactively browse servers, databases, and tables')
+    .option('-s, --server <id>', 'Server ID (skip server selection)')
+    .option('-d, --database <name>', 'Database name (skip database selection)')
+    .action(async (options) => {
+      const { BrowseCommand } = await import('./cli/browse');
+      const globalOpts = program.opts();
+      const cmd = new BrowseCommand({
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.exit(result.success ? 0 : 1);
+    });
+
   // Server credentials commands: fmo server credentials <add|list|remove>
   const serverCmd = program.command('server').description('Manage server configurations');
 
