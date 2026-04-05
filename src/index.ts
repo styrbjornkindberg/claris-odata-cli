@@ -47,6 +47,32 @@ function createProgram(): Command {
     .option('-s, --server <id>', 'Default server ID')
     .option('-d, --database <name>', 'Default database name');
 
+  // Init command
+  program
+    .command('init')
+    .description('Bootstrap ~/.fmo/context.json with servers, databases, and tables')
+    .option('--refresh', 'Update existing context.json')
+    .option('--json', 'Print generated context to stdout')
+    .action(async (options) => {
+      const { InitCommand } = await import('./cli/init');
+      const globalOpts = program.opts();
+      const cmd = new InitCommand({
+        refresh: options.refresh,
+        json: options.json,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      if (!result.success) {
+        process.stderr.write((result.error ?? 'Unknown error') + '\n');
+        process.exit(1);
+      }
+      if (options.json && result.data) {
+        process.stdout.write(JSON.stringify(result.data, null, 2) + '\n');
+      }
+      process.exit(0);
+    });
+
   // List command
   program
     .command('list <resource>')
