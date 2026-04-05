@@ -220,6 +220,20 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Health command
+  program
+    .command('health')
+    .description('Check API connectivity for configured servers')
+    .action(async (options) => {
+      const { HealthCommand } = await import('./cli/health');
+      const globalOpts = program.opts();
+      const cmd = new HealthCommand({
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
   // Browse command
   program
     .command('browse')
