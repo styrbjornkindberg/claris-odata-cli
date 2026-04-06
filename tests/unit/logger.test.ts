@@ -6,21 +6,17 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Logger } from '../../src/utils/logger';
-import type { LogLevel } from '../../src/types';
 
 describe('Logger', () => {
   let logger: Logger;
-  let stdoutSpy: ReturnType<typeof vi.spyOn>;
   let stderrSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     logger = new Logger({ timestamps: false, colors: false });
-    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   });
 
   afterEach(() => {
-    stdoutSpy.mockRestore();
     stderrSpy.mockRestore();
   });
 
@@ -32,13 +28,10 @@ describe('Logger', () => {
       logger.info('should not appear');
       logger.warn('should appear');
 
-      // At 'warn' level: debug and info should NOT appear, warn SHOULD appear
-      // warn goes to stdout, so we expect 1 call (the warn message)
-      expect(stdoutSpy).toHaveBeenCalledTimes(1);
-      const call = stdoutSpy.mock.calls[0]?.[0] ?? '';
+      expect(stderrSpy).toHaveBeenCalledTimes(1);
+      const call = stderrSpy.mock.calls[0]?.[0] ?? '';
       expect(call).toContain('WARN');
       expect(call).toContain('should appear');
-      expect(stderrSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -47,8 +40,8 @@ describe('Logger', () => {
       logger.setLevel('debug');
       logger.debug('test message');
 
-      expect(stdoutSpy).toHaveBeenCalled();
-      const call = stdoutSpy.mock.calls[0]?.[0] ?? '';
+      expect(stderrSpy).toHaveBeenCalled();
+      const call = stderrSpy.mock.calls[0]?.[0] ?? '';
       expect(call).toContain('DEBUG');
       expect(call).toContain('test message');
     });
@@ -57,16 +50,16 @@ describe('Logger', () => {
       logger.setLevel('info');
       logger.debug('test message');
 
-      expect(stdoutSpy).not.toHaveBeenCalled();
+      expect(stderrSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('info', () => {
-    it('should log info messages', () => {
+    it('should log info messages to stderr', () => {
       logger.info('test message');
 
-      expect(stdoutSpy).toHaveBeenCalled();
-      const call = stdoutSpy.mock.calls[0]?.[0] ?? '';
+      expect(stderrSpy).toHaveBeenCalled();
+      const call = stderrSpy.mock.calls[0]?.[0] ?? '';
       expect(call).toContain('INFO');
       expect(call).toContain('test message');
     });
@@ -74,17 +67,17 @@ describe('Logger', () => {
     it('should include data when provided', () => {
       logger.info('test message', { key: 'value' });
 
-      const call = stdoutSpy.mock.calls[0]?.[0] ?? '';
+      const call = stderrSpy.mock.calls[0]?.[0] ?? '';
       expect(call).toContain('"key":"value"');
     });
   });
 
   describe('warn', () => {
-    it('should log warning messages to stdout', () => {
+    it('should log warning messages to stderr', () => {
       logger.warn('test message');
 
-      expect(stdoutSpy).toHaveBeenCalled();
-      const call = stdoutSpy.mock.calls[0]?.[0] ?? '';
+      expect(stderrSpy).toHaveBeenCalled();
+      const call = stderrSpy.mock.calls[0]?.[0] ?? '';
       expect(call).toContain('WARN');
     });
   });

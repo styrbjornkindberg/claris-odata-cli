@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Claris OData CLI - Main Entry Point
  *
@@ -43,7 +44,7 @@ function createProgram(): Command {
     .description('CLI tool for working with Claris FileMaker OData API')
     .version(packageJson.version)
     .option('-v, --verbose', 'Enable verbose logging')
-    .option('-f, --format <format>', 'Output format (json, table, csv)', 'table')
+    .option('-f, --format <format>', 'Output format (json, jsonl, table, csv)', 'table')
     .option('-s, --server <id>', 'Default server ID')
     .option('-d, --database <name>', 'Default database name');
 
@@ -98,7 +99,7 @@ function createProgram(): Command {
     .description('Get records from a table')
     .requiredOption('-s, --server <id>', 'Server ID')
     .requiredOption('-d, --database <name>', 'Database name')
-    .option('-f, --filter <expr>', 'OData filter expression')
+    .option('--filter <expr>', 'OData filter expression')
     .option('--select <fields>', 'Fields to select (comma-separated)')
     .option('-t, --top <n>', 'Maximum records to return', parseInt)
     .option('--skip <n>', 'Records to skip', parseInt)
@@ -255,6 +256,85 @@ function createProgram(): Command {
       process.exit(result.success ? 0 : 1);
     });
 
+  // Profile commands: fmo profile <add|list|use|remove>
+  const profileCmd = program.command('profile').description('Manage configuration profiles');
+
+  profileCmd
+    .command('add')
+    .description('Create or update a profile')
+    .requiredOption('--name <name>', 'Profile name')
+    .option('--default-server <id>', 'Default server ID')
+    .option('--default-database <name>', 'Default database name')
+    .option('--output-format <format>', 'Default output format (json, jsonl, table, csv)')
+    .action(async (options) => {
+      const { ProfileCommand } = await import('./cli/profile');
+      const globalOpts = program.opts();
+      const cmd = new ProfileCommand({
+        action: 'add',
+        name: options.name,
+        defaultServer: options.defaultServer,
+        defaultDatabase: options.defaultDatabase,
+        outputFormat: options.outputFormat,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
+  profileCmd
+    .command('list')
+    .description('List all profiles')
+    .action(async () => {
+      const { ProfileCommand } = await import('./cli/profile');
+      const globalOpts = program.opts();
+      const cmd = new ProfileCommand({
+        action: 'list',
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
+  profileCmd
+    .command('use')
+    .description('Switch to a profile')
+    .requiredOption('--name <name>', 'Profile name')
+    .action(async (options) => {
+      const { ProfileCommand } = await import('./cli/profile');
+      const globalOpts = program.opts();
+      const cmd = new ProfileCommand({
+        action: 'use',
+        name: options.name,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
+  profileCmd
+    .command('remove')
+    .description('Remove a profile')
+    .requiredOption('--name <name>', 'Profile name')
+    .action(async (options) => {
+      const { ProfileCommand } = await import('./cli/profile');
+      const globalOpts = program.opts();
+      const cmd = new ProfileCommand({
+        action: 'remove',
+        name: options.name,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
   // Server credentials commands: fmo server credentials <add|list|remove>
   const serverCmd = program.command('server').description('Manage server configurations');
 
@@ -394,11 +474,27 @@ function createProgram(): Command {
 }
 
 /**
+ * Check if header should be shown based on argv and TTY state
+ */
+function shouldShowHeader(argv: string[]): boolean {
+  if (!process.stdout.isTTY) return false;
+  const formatIdx = argv.findIndex((a) => a === '-f' || a === '--format');
+  if (formatIdx !== -1) {
+    const fmt = argv[formatIdx + 1];
+    if (fmt && fmt !== 'table') return false;
+  }
+  if (argv.includes('--version') || argv.includes('-V')) return false;
+  if (argv.includes('--help') || argv.includes('-h')) return false;
+  return true;
+}
+
+/**
  * Main entry point
  */
 export async function main(): Promise<void> {
-  // Show ASCII header on startup
-  showHeader();
+  if (shouldShowHeader(process.argv)) {
+    showHeader();
+  }
 
   const program = createProgram();
   await program.parseAsync(process.argv);
@@ -419,6 +515,6 @@ export { EndpointBuilder } from './api/endpoints';
 export { ServerManager } from './config/servers';
 export { CredentialsManager } from './config/credentials';
 export { ProfileManager } from './config/profiles';
-export { OutputFormatter } from './utils/output';
+export { OutputFormatter } from './output/formatter';
 export { Logger, logger } from './utils/logger';
 export * from './types';

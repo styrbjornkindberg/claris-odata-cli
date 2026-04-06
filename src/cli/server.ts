@@ -11,6 +11,7 @@ import type { CommandResult, Server } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { CredentialsCommand } from './credentials';
+import { OutputFormatter } from '../output/formatter';
 import { logger } from '../utils/logger';
 
 export { CredentialsCommand };
@@ -288,12 +289,21 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
    * @returns Formatted output
    */
   formatOutput(result: CommandResult): string {
+    const formatter = new OutputFormatter(this.options.output ?? 'table');
+    const isMachine = this.options.output === 'json' || this.options.output === 'jsonl';
+
     if (!result.success) {
+      if (isMachine) {
+        return formatter.formatJson({
+          success: false,
+          error: { code: 'COMMAND_FAILED', message: result.error ?? 'Unknown error' },
+        });
+      }
       return result.error ?? 'Unknown error';
     }
 
-    if (this.options.output === 'json') {
-      return JSON.stringify(result.data, null, 2);
+    if (isMachine) {
+      return formatter.formatJson(result.data);
     }
 
     const data = result.data as Record<string, unknown>;

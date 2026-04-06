@@ -11,6 +11,7 @@ import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
+import { OutputFormatter } from '../output/formatter';
 
 /**
  * Credentials command action
@@ -259,25 +260,34 @@ export class CredentialsCommand extends BaseCommand<CredentialsOptions> {
    * @returns Formatted output
    */
   formatOutput(result: CommandResult): string {
+    const formatter = new OutputFormatter(this.options.output ?? 'table');
+    const isMachine = this.options.output === 'json' || this.options.output === 'jsonl';
+
     if (!result.success) {
+      if (isMachine) {
+        return formatter.formatJson({
+          success: false,
+          error: { code: 'COMMAND_FAILED', message: result.error ?? 'Unknown error' },
+        });
+      }
       return result.error ?? 'Unknown error';
     }
 
-    if (this.options.output === 'json') {
+    if (isMachine) {
       const data = result.data as Record<string, unknown>;
 
       // For list action, return just the entries array
       if (this.options.action === 'list') {
         const entries = (data.entries as Array<{ database: string; username: string }>) ?? [];
-        return JSON.stringify(entries, null, 2);
+        return formatter.formatJson(entries);
       }
 
       // For add action, return just database + username per spec
       if (this.options.action === 'add') {
-        return JSON.stringify({ database: data['database'], username: data['username'] }, null, 2);
+        return formatter.formatJson({ database: data['database'], username: data['username'] });
       }
 
-      return JSON.stringify(data, null, 2);
+      return formatter.formatJson(data);
     }
 
     const data = result.data as Record<string, unknown>;

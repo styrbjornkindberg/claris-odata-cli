@@ -188,24 +188,4 @@ describe('CredentialsManager', () => {
     });
   });
 
-  describe('deleteCredentials() [deprecated — delegates to deleteCredential()]', () => {
-    const mockDeletePassword = vi.mocked(keytar.deletePassword);
-
-    it('returns true when credentials deleted (delegates to deleteCredential)', async () => {
-      mockDeletePassword.mockResolvedValue(true);
-
-      const result = await manager.deleteCredentials('server1', 'mydb', 'alice');
-
-      expect(result).toBe(true);
-      expect(mockDeletePassword).toHaveBeenCalledWith('claris-odata-cli', 'server1:mydb:alice');
-    });
-
-    it('returns false when credentials not found (delegates to deleteCredential)', async () => {
-      mockDeletePassword.mockResolvedValue(false);
-
-      const result = await manager.deleteCredentials('server1', 'mydb', 'alice');
-
-      expect(result).toBe(false);
-    });
-  });
 });

@@ -69,19 +69,6 @@ export class CredentialsManager {
   }
 
   /**
-   * Delete credentials from system keychain
-   *
-   * @param serverId - Server ID
-   * @param database - Database name
-   * @param username - Username
-   * @returns Whether credentials were deleted
-   * @deprecated Use deleteCredential() instead
-   */
-  async deleteCredentials(serverId: string, database: string, username: string): Promise<boolean> {
-    return this.deleteCredential(serverId, database, username);
-  }
-
-  /**
    * Build account key for keychain storage
    *
    * @param serverId - Server ID

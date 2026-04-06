@@ -320,9 +320,8 @@ export class ListCommand extends BaseCommand<ListOptions> {
   formatOutput(result: CommandResult): string {
     if (!result.success) {
       return this.formatter.formatJson({
-        type: 'error',
-        code: 'ODATA_QUERY_FAILED',
-        message: result.error,
+        success: false,
+        error: { code: 'ODATA_QUERY_FAILED', message: result.error ?? 'Unknown error' },
       });
     }
 

@@ -1,6 +1,6 @@
 {
   "name": "@claris/odata-cli",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "CLI tool for working with Claris FileMaker OData API",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,14 +11,25 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest run --exclude tests/unit/cli/browse.action-menu.test.ts",
-    "test:all": "vitest run --exclude tests/unit/cli/browse.action-menu.test.ts",
-    "test:browse": "vitest run tests/unit/cli/browse.tty.test.ts tests/unit/cli/browse.server-selection.test.ts tests/unit/cli/browse.credentials.test.ts tests/unit/cli/browse.database-selection.test.ts tests/unit/cli/browse.table-selection.test.ts",
-    "test:browse:all": "vitest run tests/unit/cli/browse.tty.test.ts tests/unit/cli/browse.server-selection.test.ts tests/unit/cli/browse.credentials.test.ts tests/unit/cli/browse.database-selection.test.ts tests/unit/cli/browse.table-selection.test.ts tests/unit/cli/browse.action-menu.test.ts",
-    "test:coverage": "vitest run --coverage --exclude tests/unit/cli/browse.action-menu.test.ts",
+    "test": "vitest run",
+    "test:all": "vitest run",
+    "test:browse": "vitest run tests/unit/cli/browse.tty.test.ts tests/unit/cli/browse.server-selection.test.ts tests/unit/cli/browse.credentials.test.ts tests/unit/cli/browse.database-selection.test.ts tests/unit/cli/browse.table-selection.test.ts tests/unit/cli/browse.action-menu.test.ts",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "prepublishOnly": "npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seldon-enterprises/claris-odata-cli.git"
   },
   "keywords": [
     "claris",

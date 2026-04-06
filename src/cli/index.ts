@@ -7,8 +7,49 @@
  */
 
 import type { CommandResult, OutputFormat } from '../types';
-import { OutputFormatter } from '../utils/output';
+import { OutputFormatter } from '../output/formatter';
 import { logger } from '../utils/logger';
+import {
+  ODataError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ValidationError,
+} from '../api/errors';
+
+/**
+ * Error code vocabulary for machine-readable output
+ */
+export type ErrorCode =
+  | 'AUTH_FAILED'
+  | 'NOT_FOUND'
+  | 'VALIDATION_ERROR'
+  | 'CONNECTION_ERROR'
+  | 'COMMAND_FAILED';
+
+/**
+ * Map an error to a stable error code
+ */
+function resolveErrorCode(error: unknown): ErrorCode {
+  if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
+    return 'AUTH_FAILED';
+  }
+  if (error instanceof NotFoundError) {
+    return 'NOT_FOUND';
+  }
+  if (error instanceof ValidationError) {
+    return 'VALIDATION_ERROR';
+  }
+  if (error instanceof ODataError) {
+    if (error.statusCode === 401 || error.statusCode === 403) return 'AUTH_FAILED';
+    if (error.statusCode === 404) return 'NOT_FOUND';
+    if (error.statusCode === 400) return 'VALIDATION_ERROR';
+  }
+  if (error instanceof Error && /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|timeout/i.test(error.message)) {
+    return 'CONNECTION_ERROR';
+  }
+  return 'COMMAND_FAILED';
+}
 
 /**
  * Base command options
@@ -47,6 +88,14 @@ export abstract class BaseCommand<TOptions extends CommandOptions = CommandOptio
   abstract execute(): Promise<CommandResult>;
 
   /**
+   * Check if current output format is machine-readable (JSON or JSONL)
+   */
+  protected isMachineReadable(): boolean {
+    const fmt = this.options.output;
+    return fmt === 'json' || fmt === 'jsonl';
+  }
+
+  /**
    * Run the command with error handling
    *
    * @returns Exit code (0 for success, non-zero for failure)
@@ -56,7 +105,15 @@ export abstract class BaseCommand<TOptions extends CommandOptions = CommandOptio
       const result = await this.execute();
 
       if (!result.success) {
-        logger.error(result.error ?? 'Command failed');
+        if (this.isMachineReadable()) {
+          const errorPayload = this.output.formatJson({
+            success: false,
+            error: { code: 'COMMAND_FAILED', message: result.error ?? 'Command failed' },
+          });
+          process.stdout.write(`${errorPayload}\n`);
+        } else {
+          logger.error(result.error ?? 'Command failed');
+        }
         return 1;
       }
 
@@ -67,7 +124,16 @@ export abstract class BaseCommand<TOptions extends CommandOptions = CommandOptio
       return 0;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      logger.error(message);
+      const code = resolveErrorCode(error);
+      if (this.isMachineReadable()) {
+        const errorPayload = this.output.formatJson({
+          success: false,
+          error: { code, message },
+        });
+        process.stdout.write(`${errorPayload}\n`);
+      } else {
+        logger.error(message);
+      }
       return 1;
     }
   }
@@ -78,7 +144,7 @@ export abstract class BaseCommand<TOptions extends CommandOptions = CommandOptio
    * @param data - Data to print
    */
   protected printResult(data: unknown): void {
-    const output = this.output.formatData(data as Record<string, unknown>);
+    const output = this.output.format(data as Record<string, unknown>);
     process.stdout.write(`${output}\n`);
   }
 }
