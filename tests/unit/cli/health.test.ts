@@ -7,19 +7,25 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import axios from 'axios';
 import { HealthCommand } from '../../../src/cli/health';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
-import { ODataClient } from '../../../src/api/client';
+import { stripAnsi } from '../../../src/lib/theme';
 
 // Mock dependencies
 vi.mock('../../../src/config/servers');
 vi.mock('../../../src/config/credentials');
-vi.mock('../../../src/api/client');
+vi.mock('axios', () => ({
+  default: {
+    get: vi.fn(),
+  },
+}));
 
 describe('HealthCommand', () => {
   let mockServerManager: any;
   let mockCredentialsManager: any;
+  const mockAxiosGet = vi.mocked(axios.get);
 
   beforeEach(() => {
     mockServerManager = {
@@ -47,14 +53,9 @@ describe('HealthCommand', () => {
       ]);
       mockCredentialsManager.listCredentials.mockResolvedValue([
         { serverId: 'server-1', database: 'TestDB', username: 'admin' },
-        { serverId: 'server-2', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-
-      // Mock axios
-      vi.mock('axios', () => ({
-        default: { get: vi.fn().mockResolvedValue({ data: {} }) }
-      }));
+      mockAxiosGet.mockResolvedValue({ data: {} });
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });
@@ -93,10 +94,11 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 'server-1', name: 'Production', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockRejectedValue({ code: 'ECONNREFUSED' });
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+      mockAxiosGet.mockRejectedValue({ code: 'ECONNREFUSED' });
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });
@@ -115,10 +117,11 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 'server-1', name: 'Production', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockRejectedValue({ code: 'ETIMEDOUT' });
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+      mockAxiosGet.mockRejectedValue({ code: 'ETIMEDOUT' });
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });
@@ -134,10 +137,11 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 'server-1', name: 'Production', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockRejectedValue({ code: 'ENOTFOUND' });
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+      mockAxiosGet.mockRejectedValue({ code: 'ENOTFOUND' });
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });
@@ -153,10 +157,11 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 'server-1', name: 'Production', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockRejectedValue({ response: { status: 401 } });
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+      mockAxiosGet.mockRejectedValue({ response: { status: 401 } });
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });
@@ -172,10 +177,11 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 'server-1', name: 'Production', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockRejectedValue({ response: { status: 500 } });
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+      mockAxiosGet.mockRejectedValue({ response: { status: 500 } });
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });
@@ -206,11 +212,12 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 'server-1', name: 'Production', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve({ data: {} }), 10))
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+      mockAxiosGet.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve({ data: {} }), 10))
       );
 
       // Execute
@@ -238,10 +245,11 @@ describe('HealthCommand', () => {
 
       const output = cmd.formatOutput(result);
 
-      expect(output).toContain('Prod');
-      expect(output).toContain('Connected');
-      expect(output).toContain('50ms');
-      expect(output).toContain('Healthy: 1');
+      const plain = stripAnsi(output);
+      expect(plain).toContain('Prod');
+      expect(plain).toContain('Connected');
+      expect(plain).toContain('50ms');
+      expect(plain).toContain('Healthy: 1');
     });
 
     it('formats unhealthy servers with X marks', () => {
@@ -258,9 +266,10 @@ describe('HealthCommand', () => {
 
       const output = cmd.formatOutput(result);
 
-      expect(output).toContain('Prod');
-      expect(output).toContain('Connection refused');
-      expect(output).toContain('Unhealthy: 1');
+      const plain = stripAnsi(output);
+      expect(plain).toContain('Prod');
+      expect(plain).toContain('Connection refused');
+      expect(plain).toContain('Unhealthy: 1');
     });
 
     it('formats no-credentials status with warning', () => {
@@ -278,7 +287,7 @@ describe('HealthCommand', () => {
       const output = cmd.formatOutput(result);
 
       // The status text is 'No credentials' (not the error message)
-      expect(output).toContain('No credentials');
+      expect(stripAnsi(output)).toContain('No credentials');
     });
 
     it('formats empty result with warning', () => {
@@ -293,7 +302,7 @@ describe('HealthCommand', () => {
 
       const output = cmd.formatOutput(result);
 
-      expect(output).toContain('No servers configured');
+      expect(stripAnsi(output)).toContain('No servers configured');
     });
   });
 
@@ -324,10 +333,11 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 's1', name: 'Prod', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 's1', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockResolvedValue({ data: {} });
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+      mockAxiosGet.mockResolvedValue({ data: {} });
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });
@@ -342,10 +352,11 @@ describe('HealthCommand', () => {
       mockServerManager.listServers.mockReturnValue([
         { id: 's1', name: 'Prod', host: 'fm.example.com', port: 443 },
       ]);
-      mockCredentialsManager.getCredentials.mockReturnValue([
-        { database: 'TestDB', username: 'admin', password: 'test' },
+      mockCredentialsManager.listCredentials.mockResolvedValue([
+        { serverId: 's1', database: 'TestDB', username: 'admin' },
       ]);
-      mockODataClient.get.mockRejectedValue({ code: 'ECONNREFUSED' });
+      mockCredentialsManager.getCredentials.mockResolvedValue('password123');
+      mockAxiosGet.mockRejectedValue({ code: 'ECONNREFUSED' });
 
       // Execute
       const cmd = new HealthCommand({ output: 'table' });

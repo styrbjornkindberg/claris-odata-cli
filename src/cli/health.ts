@@ -37,6 +37,14 @@ export interface HealthResult {
   generatedAt: string;
 }
 
+interface HttpErrorShape {
+  code?: string;
+  message?: string;
+  response?: {
+    status?: number;
+  };
+}
+
 /**
  * HealthCommand - Check API connectivity
  */
@@ -63,7 +71,7 @@ export class HealthCommand {
       serverHealths.push(health);
     }
 
-    const healthy = serverHealths.filter(s => s.status === 'ok').length;
+    const healthy = serverHealths.filter((s) => s.status === 'ok').length;
     const unhealthy = serverHealths.length - healthy;
 
     return {
@@ -78,7 +86,12 @@ export class HealthCommand {
   /**
    * Check connectivity for a single server
    */
-  private async checkServer(server: { id: string; name: string; host: string; port?: number }): Promise<ServerHealth> {
+  private async checkServer(server: {
+    id: string;
+    name: string;
+    host: string;
+    port?: number;
+  }): Promise<ServerHealth> {
     const health: ServerHealth = {
       id: server.id,
       name: server.name,
@@ -90,7 +103,7 @@ export class HealthCommand {
     try {
       // Get credentials for this server
       const credentials = await this.credentialsManager.listCredentials(server.id);
-      
+
       if (!credentials || credentials.length === 0) {
         health.status = 'no-credentials';
         health.error = 'No credentials stored';
@@ -104,13 +117,13 @@ export class HealthCommand {
         cred.database,
         cred.username
       );
-      
+
       if (!storedPassword) {
         health.status = 'no-credentials';
         health.error = 'Credentials stored but password not found';
         return health;
       }
-      
+
       // Test connectivity with a simple HTTP request
       const protocol = health.port === 443 ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${health.port}/fmi/odata/v4`;
@@ -123,8 +136,7 @@ export class HealthCommand {
         timeout: 5000,
       });
       health.latency = Date.now() - start;
-
-    } catch (error: any) {
+    } catch (error: unknown) {
       health.status = 'error';
       health.error = this.formatError(error);
     }
@@ -135,29 +147,31 @@ export class HealthCommand {
   /**
    * Format error message for display
    */
-  private formatError(error: any): string {
-    if (error.code === 'ECONNREFUSED') {
+  private formatError(error: unknown): string {
+    const parsed = error as HttpErrorShape;
+
+    if (parsed.code === 'ECONNREFUSED') {
       return 'Connection refused';
     }
-    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+    if (parsed.code === 'ETIMEDOUT' || parsed.code === 'ECONNABORTED') {
       return 'Connection timeout';
     }
-    if (error.code === 'ENOTFOUND') {
+    if (parsed.code === 'ENOTFOUND') {
       return 'Host not found';
     }
-    if (error.code === 'CERT_HAS_EXPIRED') {
+    if (parsed.code === 'CERT_HAS_EXPIRED') {
       return 'Certificate expired';
     }
-    if (error.response?.status === 401) {
+    if (parsed.response?.status === 401) {
       return 'Authentication failed';
     }
-    if (error.response?.status === 404) {
+    if (parsed.response?.status === 404) {
       return 'Database not found';
     }
-    if (error.response?.status === 500) {
+    if (parsed.response?.status === 500) {
       return 'Server error';
     }
-    return error.message || 'Unknown error';
+    return parsed.message ?? 'Unknown error';
   }
 
   /**
@@ -178,16 +192,19 @@ export class HealthCommand {
 
     // Server status
     for (const server of result.servers) {
-      const statusIcon = server.status === 'ok' ? c.ok : 
-                         server.status === 'no-credentials' ? c.warn : c.fail;
-      const statusText = server.status === 'ok' ? c.success('Connected') :
-                         server.status === 'no-credentials' ? c.warn('No credentials') :
-                         c.error(server.error || 'Error');
+      const statusIcon =
+        server.status === 'ok' ? c.ok : server.status === 'no-credentials' ? c.warn : c.fail;
+      const statusText =
+        server.status === 'ok'
+          ? c.success('Connected')
+          : server.status === 'no-credentials'
+            ? c.warn('No credentials')
+            : c.error(server.error || 'Error');
 
       lines.push(`${statusIcon} ${c.bold(server.name)}`);
       lines.push(`  ${c.muted('Host:')} ${server.host}:${server.port}`);
       lines.push(`  ${c.muted('Status:')} ${statusText}`);
-      
+
       if (server.latency !== undefined) {
         lines.push(`  ${c.muted('Latency:')} ${server.latency}ms`);
       }
@@ -196,7 +213,9 @@ export class HealthCommand {
 
     // Summary
     lines.push(c.separator());
-    lines.push(`${c.label('Total:')} ${result.total}  ${c.label('Healthy:')} ${c.success(String(result.healthy))}  ${c.label('Unhealthy:')} ${result.unhealthy > 0 ? c.error(String(result.unhealthy)) : c.success('0')}`);
+    lines.push(
+      `${c.label('Total:')} ${result.total}  ${c.label('Healthy:')} ${c.success(String(result.healthy))}  ${c.label('Unhealthy:')} ${result.unhealthy > 0 ? c.error(String(result.unhealthy)) : c.success('0')}`
+    );
 
     return lines.join('\n');
   }
@@ -206,7 +225,7 @@ export class HealthCommand {
    */
   formatJsonl(result: HealthResult): string {
     // Convert ServerHealth objects to plain records for JSONL
-    const servers = result.servers.map(s => ({
+    const servers = result.servers.map((s) => ({
       id: s.id,
       name: s.name,
       host: s.host,
@@ -225,17 +244,17 @@ export class HealthCommand {
     try {
       const result = await this.execute();
       const format = this.options.output ?? 'table';
-      
+
       switch (format) {
         case 'json':
-          console.log(this.formatter.formatJson(result));
+          process.stdout.write(this.formatter.formatJson(result) + '\n');
           break;
         case 'jsonl':
-          console.log(this.formatJsonl(result));
+          process.stdout.write(this.formatJsonl(result) + '\n');
           break;
         case 'csv':
           // Convert ServerHealth objects to plain records for CSV
-          const csvServers = result.servers.map(s => ({
+          const csvServers = result.servers.map((s) => ({
             id: s.id,
             name: s.name,
             host: s.host,
@@ -244,18 +263,19 @@ export class HealthCommand {
             latency: s.latency ?? '',
             error: s.error ?? '',
           }));
-          console.log(this.formatter.formatCsv(csvServers));
+          process.stdout.write(this.formatter.formatCsv(csvServers) + '\n');
           break;
         case 'table':
         default:
-          console.log(this.formatOutput(result));
+          process.stdout.write(this.formatOutput(result) + '\n');
           break;
       }
 
       // Exit with error code if any servers are unhealthy
       return result.unhealthy > 0 ? 1 : 0;
-    } catch (error: any) {
-      logger.error('Health check failed', error);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error('Health check failed', { error: message });
       return 1;
     }
   }

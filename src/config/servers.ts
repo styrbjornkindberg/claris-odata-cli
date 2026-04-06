@@ -6,24 +6,41 @@
  * @module config/servers
  */
 
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import type { Server } from '../types';
 
+const CONFIG_DIR = path.join(os.homedir(), '.config', 'claris-odata-cli');
+const SERVERS_FILE = path.join(CONFIG_DIR, 'servers.json');
+
+function readServers(): Record<string, Server> {
+  try {
+    const raw = fs.readFileSync(SERVERS_FILE, 'utf8');
+    return JSON.parse(raw) as Record<string, Server>;
+  } catch {
+    return {};
+  }
+}
+
+function writeServers(servers: Record<string, Server>): void {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(SERVERS_FILE, JSON.stringify(servers, null, 2), 'utf8');
+}
+
 /**
- * In-memory server store (placeholder for persistent storage)
- *
- * TODO: Implement persistent storage using the `conf` package.
- * TODO: Consider encryption for sensitive server details.
+ * Persistent server store backed by ~/.config/claris-odata-cli/servers.json
  */
 class ServerStore {
-  private servers: Map<string, Server> = new Map();
-
   /**
    * Add or update a server configuration
    *
    * @param server - Server configuration
    */
   set(server: Server): void {
-    this.servers.set(server.id, server);
+    const all = readServers();
+    all[server.id] = server;
+    writeServers(all);
   }
 
   /**
@@ -33,7 +50,7 @@ class ServerStore {
    * @returns Server configuration or undefined
    */
   get(id: string): Server | undefined {
-    return this.servers.get(id);
+    return readServers()[id];
   }
 
   /**
@@ -42,7 +59,7 @@ class ServerStore {
    * @returns Array of servers
    */
   getAll(): Server[] {
-    return Array.from(this.servers.values());
+    return Object.values(readServers());
   }
 
   /**
@@ -52,7 +69,11 @@ class ServerStore {
    * @returns Whether the server was removed
    */
   delete(id: string): boolean {
-    return this.servers.delete(id);
+    const all = readServers();
+    if (!(id in all)) return false;
+    delete all[id];
+    writeServers(all);
+    return true;
   }
 
   /**
@@ -62,7 +83,7 @@ class ServerStore {
    * @returns Whether the server exists
    */
   has(id: string): boolean {
-    return this.servers.has(id);
+    return id in readServers();
   }
 }
 

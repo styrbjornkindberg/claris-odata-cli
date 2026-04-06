@@ -6,6 +6,9 @@
  * @module config/profiles
  */
 
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import type { Profile } from '../types';
 
 /**
@@ -13,23 +16,37 @@ import type { Profile } from '../types';
  */
 const DEFAULT_PROFILE = 'default';
 
+const CONFIG_DIR = path.join(os.homedir(), '.config', 'claris-odata-cli');
+const PROFILES_FILE = path.join(CONFIG_DIR, 'profiles.json');
+
+interface ProfilesData {
+  profiles: Record<string, Profile>;
+  activeProfile: string;
+}
+
+const DEFAULTS: ProfilesData = {
+  profiles: { [DEFAULT_PROFILE]: { name: DEFAULT_PROFILE, outputFormat: 'table' } },
+  activeProfile: DEFAULT_PROFILE,
+};
+
+function readData(): ProfilesData {
+  try {
+    const raw = fs.readFileSync(PROFILES_FILE, 'utf8');
+    return JSON.parse(raw) as ProfilesData;
+  } catch {
+    return { profiles: { ...DEFAULTS.profiles }, activeProfile: DEFAULTS.activeProfile };
+  }
+}
+
+function writeData(data: ProfilesData): void {
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  fs.writeFileSync(PROFILES_FILE, JSON.stringify(data, null, 2), 'utf8');
+}
+
 /**
- * In-memory profile store (placeholder for persistent storage)
- *
- * TODO: Implement persistent storage using the `conf` package.
+ * Persistent profile store backed by ~/.config/claris-odata-cli/profiles.json
  */
 class ProfileStore {
-  private profiles: Map<string, Profile> = new Map();
-  private activeProfile: string = DEFAULT_PROFILE;
-
-  constructor() {
-    // Initialize with default profile
-    this.profiles.set(DEFAULT_PROFILE, {
-      name: DEFAULT_PROFILE,
-      outputFormat: 'table',
-    });
-  }
-
   /**
    * Get a profile by name
    *
@@ -37,7 +54,7 @@ class ProfileStore {
    * @returns Profile or undefined
    */
   get(name: string): Profile | undefined {
-    return this.profiles.get(name);
+    return readData().profiles[name];
   }
 
   /**
@@ -46,7 +63,7 @@ class ProfileStore {
    * @returns Array of profiles
    */
   getAll(): Profile[] {
-    return Array.from(this.profiles.values());
+    return Object.values(readData().profiles);
   }
 
   /**
@@ -55,7 +72,9 @@ class ProfileStore {
    * @param profile - Profile configuration
    */
   set(profile: Profile): void {
-    this.profiles.set(profile.name, profile);
+    const data = readData();
+    data.profiles[profile.name] = profile;
+    writeData(data);
   }
 
   /**
@@ -68,7 +87,11 @@ class ProfileStore {
     if (name === DEFAULT_PROFILE) {
       return false; // Cannot delete default profile
     }
-    return this.profiles.delete(name);
+    const data = readData();
+    if (!(name in data.profiles)) return false;
+    delete data.profiles[name];
+    writeData(data);
+    return true;
   }
 
   /**
@@ -77,7 +100,7 @@ class ProfileStore {
    * @returns Active profile name
    */
   getActive(): string {
-    return this.activeProfile;
+    return readData().activeProfile;
   }
 
   /**
@@ -87,8 +110,10 @@ class ProfileStore {
    * @returns Whether the profile was activated
    */
   setActive(name: string): boolean {
-    if (this.profiles.has(name)) {
-      this.activeProfile = name;
+    const data = readData();
+    if (name in data.profiles) {
+      data.activeProfile = name;
+      writeData(data);
       return true;
     }
     return false;

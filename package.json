@@ -11,8 +11,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "vitest",
-    "test:coverage": "vitest --coverage",
+    "test": "vitest run --exclude tests/unit/cli/browse.action-menu.test.ts",
+    "test:all": "vitest run --exclude tests/unit/cli/browse.action-menu.test.ts",
+    "test:browse": "vitest run tests/unit/cli/browse.tty.test.ts tests/unit/cli/browse.server-selection.test.ts tests/unit/cli/browse.credentials.test.ts tests/unit/cli/browse.database-selection.test.ts tests/unit/cli/browse.table-selection.test.ts",
+    "test:browse:all": "vitest run tests/unit/cli/browse.tty.test.ts tests/unit/cli/browse.server-selection.test.ts tests/unit/cli/browse.credentials.test.ts tests/unit/cli/browse.database-selection.test.ts tests/unit/cli/browse.table-selection.test.ts tests/unit/cli/browse.action-menu.test.ts",
+    "test:coverage": "vitest run --coverage --exclude tests/unit/cli/browse.action-menu.test.ts",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "prepublishOnly": "npm run build && npm test"

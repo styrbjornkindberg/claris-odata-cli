@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { OutputFormatter, type TableColumn } from '../../src/utils/output';
 import type { OutputFormat } from '../../src/types';
+import { stripAnsi } from '../../src/lib/theme';
 
 describe('OutputFormatter', () => {
   let formatter: OutputFormatter;
@@ -96,7 +97,7 @@ describe('OutputFormatter', () => {
 
     it('should return "No data" for empty array', () => {
       const result = formatter.formatData([]);
-      expect(result).toBe('No data');
+      expect(stripAnsi(result)).toBe('No data');
     });
   });
 });

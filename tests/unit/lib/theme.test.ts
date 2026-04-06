@@ -206,7 +206,7 @@ describe('Theme', () => {
   describe('c.divider', () => {
     it('should return divider character', () => {
       const result = c.divider();
-      expect(result).toBe('│');
+      expect(stripAnsi(result)).toBe('│');
     });
   });
 
@@ -261,7 +261,7 @@ describe('Theme', () => {
     it('should handle ANSI codes in calculation', () => {
       const colored = c.brand('Hi');
       const result = padEnd(colored, 6);
-      expect(result.length).toBe(6);
+      expect(stripAnsi(result).length).toBe(6);
     });
 
     it('should handle width of 0', () => {

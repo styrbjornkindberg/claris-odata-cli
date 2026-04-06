@@ -11,8 +11,25 @@ import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { OutputFormatter } from '../output/formatter';
-import { c } from '../lib/theme';
 import axios from 'axios';
+
+interface ODataServiceEntry {
+  name: string;
+  kind?: string;
+  url?: string;
+}
+
+interface ODataServiceDocument {
+  value?: ODataServiceEntry[];
+}
+
+interface HttpErrorShape {
+  code?: string;
+  message?: string;
+  response?: {
+    status?: number;
+  };
+}
 
 /**
  * List command options
@@ -22,6 +39,8 @@ export interface ListOptions extends CommandOptions {
   resource: 'servers' | 'databases' | 'tables';
   /** Server ID (required for databases and tables) */
   serverId?: string;
+  /** Database name (required for tables) */
+  database?: string;
 }
 
 /**
@@ -100,7 +119,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
 
     const serverManager = new ServerManager();
     const server = serverManager.getServer(this.options.serverId);
-    
+
     if (!server) {
       return {
         success: false,
@@ -112,7 +131,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
       // Get credentials
       const credentialsManager = new CredentialsManager();
       const credentials = await credentialsManager.listCredentials(this.options.serverId);
-      
+
       if (!credentials || credentials.length === 0) {
         return {
           success: false,
@@ -140,7 +159,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
       const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}/fmi/odata/v4`;
       const authToken = Buffer.from(`${cred.username}:${password}`).toString('base64');
 
-      const response = await axios.get(`${baseUrl}/`, {
+      const response = await axios.get<ODataServiceDocument>(`${baseUrl}/`, {
         headers: { Authorization: `Basic ${authToken}` },
         timeout: 10000,
       });
@@ -148,11 +167,12 @@ export class ListCommand extends BaseCommand<ListOptions> {
       // Parse the service document response
       // FileMaker OData returns a list of databases in the service document
       const data = response.data;
-      const databases = data.value?.map((db: any) => ({
-        name: db.name,
-        kind: db.kind,
-        url: db.url,
-      })) ?? [];
+      const databases =
+        data.value?.map((db) => ({
+          name: db.name,
+          kind: db.kind,
+          url: db.url,
+        })) ?? [];
 
       return {
         success: true,
@@ -162,7 +182,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
           databases,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
         error: this.formatError(error),
@@ -173,26 +193,28 @@ export class ListCommand extends BaseCommand<ListOptions> {
   /**
    * Format error message
    */
-  private formatError(error: any): string {
-    if (error.code === 'ECONNREFUSED') {
+  private formatError(error: unknown): string {
+    const parsed = error as HttpErrorShape;
+
+    if (parsed.code === 'ECONNREFUSED') {
       return 'Connection refused';
     }
-    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+    if (parsed.code === 'ETIMEDOUT' || parsed.code === 'ECONNABORTED') {
       return 'Connection timeout';
     }
-    if (error.code === 'ENOTFOUND') {
+    if (parsed.code === 'ENOTFOUND') {
       return 'Host not found';
     }
-    if (error.response?.status === 401) {
+    if (parsed.response?.status === 401) {
       return 'Authentication failed';
     }
-    if (error.response?.status === 404) {
+    if (parsed.response?.status === 404) {
       return 'Server not found';
     }
-    if (error.response?.status === 500) {
+    if (parsed.response?.status === 500) {
       return 'Server error';
     }
-    return error.message ?? 'Unknown error';
+    return parsed.message ?? 'Unknown error';
   }
 
   /**
@@ -201,12 +223,92 @@ export class ListCommand extends BaseCommand<ListOptions> {
    * @returns Command result with list of tables
    */
   private async listTables(): Promise<CommandResult> {
-    // TODO: Implement table listing via OData metadata
-    // This requires an authenticated connection to a specific database
-    return {
-      success: false,
-      error: c.error('Table listing not yet implemented'),
-    };
+    if (!this.options.serverId) {
+      return {
+        success: false,
+        error: 'Server ID is required to list tables. Use --server <id>',
+      };
+    }
+
+    if (!this.options.database) {
+      return {
+        success: false,
+        error: 'Database name is required to list tables. Use --database <name>',
+      };
+    }
+
+    const serverManager = new ServerManager();
+    const server = serverManager.getServer(this.options.serverId);
+
+    if (!server) {
+      return {
+        success: false,
+        error: `Server not found: ${this.options.serverId}`,
+      };
+    }
+
+    try {
+      const credentialsManager = new CredentialsManager();
+      const credentials = await credentialsManager.listCredentials(this.options.serverId);
+      const entry = credentials.find((credential) => credential.database === this.options.database);
+
+      if (!entry) {
+        return {
+          success: false,
+          error:
+            'No credentials stored for this server/database. Use `fmo server credentials add` first.',
+        };
+      }
+
+      const password = await credentialsManager.getCredentials(
+        this.options.serverId,
+        entry.database,
+        entry.username
+      );
+
+      if (!password) {
+        return {
+          success: false,
+          error: 'Credentials stored but password not found.',
+        };
+      }
+
+      const protocol = server.port === 443 ? 'https' : 'http';
+      const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}/fmi/odata/v4`;
+      const authToken = Buffer.from(`${entry.username}:${password}`).toString('base64');
+
+      const response = await axios.get<string>(
+        `${baseUrl}/${encodeURIComponent(this.options.database)}/$metadata`,
+        {
+          headers: {
+            Authorization: `Basic ${authToken}`,
+            Accept: 'application/xml',
+            'OData-Version': '4.0',
+            'OData-MaxVersion': '4.0',
+          },
+          timeout: 10000,
+        }
+      );
+
+      const tables = [...response.data.matchAll(/<EntitySet\s+Name="([^"]+)"/g)].map((match) => ({
+        name: match[1],
+      }));
+
+      return {
+        success: true,
+        data: {
+          type: 'tables',
+          server: this.options.serverId,
+          database: this.options.database,
+          tables,
+        },
+      };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        error: this.formatError(error),
+      };
+    }
   }
 
   /**
@@ -225,8 +327,14 @@ export class ListCommand extends BaseCommand<ListOptions> {
     }
 
     // For JSONL format, output one record per line
-    if (this.options.output === 'jsonl' && result.data && Array.isArray((result.data as any).servers)) {
-      return this.formatter.formatJsonl((result.data as any).servers);
+    if (
+      this.options.output === 'jsonl' &&
+      result.data &&
+      Array.isArray((result.data as { servers?: unknown[] }).servers)
+    ) {
+      return this.formatter.formatJsonl(
+        (result.data as { servers: Record<string, unknown>[] }).servers
+      );
     }
 
     // For JSON or table format

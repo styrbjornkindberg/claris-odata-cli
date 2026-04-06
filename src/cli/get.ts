@@ -62,7 +62,7 @@ export class GetCommand extends BaseCommand<GetOptions> {
       // Get server configuration
       const serverManager = new ServerManager();
       const server = serverManager.getServer(this.options.serverId);
-      
+
       if (!server) {
         return {
           success: false,
@@ -70,31 +70,38 @@ export class GetCommand extends BaseCommand<GetOptions> {
         };
       }
 
-      // Get credentials
+      // Resolve stored credential entry for this server+database
       const credentialsManager = new CredentialsManager();
+      const entries = await credentialsManager.listCredentials(this.options.serverId);
+      const entry = entries.find((e) => e.database === this.options.database);
+
+      if (!entry) {
+        return {
+          success: false,
+          error: `No credentials found for server '${this.options.serverId}' and database '${this.options.database}'`,
+        };
+      }
+
       const credentials = await credentialsManager.getCredentials(
         this.options.serverId,
-        this.options.database,
-        this.options.serverId // Using serverId as username placeholder
+        entry.database,
+        entry.username
       );
 
       if (!credentials) {
         return {
           success: false,
-          error: 'No credentials found for this server/database',
+          error: `Stored credentials are incomplete for server '${this.options.serverId}' and database '${this.options.database}'`,
         };
       }
 
       // Build OData client
-      const protocol = server.secure ?? true ? 'https' : 'http';
+      const protocol = (server.secure ?? true) ? 'https' : 'http';
       const port = server.port ?? 443;
       const baseUrl = `${protocol}://${server.host}:${port}/fmi/odata/v4`;
-      
+
       const authManager = new AuthManager();
-      const authToken = authManager.createBasicAuthToken(
-        this.options.serverId, // Placeholder
-        credentials
-      );
+      const authToken = authManager.createBasicAuthToken(entry.username, credentials);
 
       const client = new ODataClient({
         baseUrl,
@@ -118,10 +125,11 @@ export class GetCommand extends BaseCommand<GetOptions> {
         success: true,
         data: records,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         success: false,
-        error: error.message ?? 'Unknown error',
+        error: message,
       };
     }
   }

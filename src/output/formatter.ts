@@ -162,7 +162,10 @@ export class OutputFormatter {
         .map((key) => {
           const value = item[key];
           // Escape quotes and wrap in quotes if needed
-          if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+          if (
+            typeof value === 'string' &&
+            (value.includes(',') || value.includes('"') || value.includes('\n'))
+          ) {
             return `"${String(value).replace(/"/g, '""')}"`;
           }
           return String(value ?? '');
@@ -281,6 +284,9 @@ export class OutputFormatter {
  * @param columns - Column definitions for table/CSV output
  * @returns OutputFormatter instance
  */
-export function createFormatter(format: OutputFormat = 'table', columns?: TableColumn[]): OutputFormatter {
+export function createFormatter(
+  format: OutputFormat = 'table',
+  columns?: TableColumn[]
+): OutputFormatter {
   return new OutputFormatter(format, columns);
 }

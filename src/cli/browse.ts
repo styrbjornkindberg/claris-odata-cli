@@ -660,7 +660,7 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
 
             // Use OutputFormatter for structured output
             const formatter = new OutputFormatter(this.options.output ?? 'table');
-            
+
             if (actionResult.success && actionResult.data !== undefined) {
               const output = formatter.formatJson(actionResult.data);
               process.stdout.write(`${c.muted(output)}\n`);

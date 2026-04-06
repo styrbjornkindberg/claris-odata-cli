@@ -27,7 +27,7 @@ function showHeader(): void {
     c.muted('Version: ') + require('../package.json').version,
     c.muted('Docs: https://help.claris.com/en/odata-guide/'),
   ]);
-  console.log(header);
+  process.stdout.write(`${header}\n`);
 }
 
 /**
@@ -78,12 +78,14 @@ function createProgram(): Command {
     .command('list <resource>')
     .description('List servers, databases, or tables')
     .option('-s, --server <id>', 'Server ID (required for databases and tables)')
+    .option('-d, --database <name>', 'Database name (required for tables)')
     .action(async (resource: string, options) => {
       const { ListCommand } = await import('./cli/list');
       const globalOpts = program.opts();
       const cmd = new ListCommand({
         resource: resource as 'servers' | 'databases' | 'tables',
         serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
         output: globalOpts.format as OutputFormat,
         verbose: globalOpts.verbose ?? false,
       });
@@ -336,6 +338,14 @@ export async function main(): Promise<void> {
 
   const program = createProgram();
   await program.parseAsync(process.argv);
+}
+
+if (require.main === module) {
+  void main().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    process.stderr.write(message + '\n');
+    process.exit(1);
+  });
 }
 
 // Export public API
