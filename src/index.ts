@@ -258,6 +258,70 @@ function createProgram(): Command {
   // Server credentials commands: fmo server credentials <add|list|remove>
   const serverCmd = program.command('server').description('Manage server configurations');
 
+  serverCmd
+    .command('add')
+    .description('Add a server configuration')
+    .requiredOption('--name <name>', 'Server name')
+    .requiredOption('--host <host>', 'Server hostname')
+    .option('--port <port>', 'Server port', parseInt)
+    .option('--insecure', 'Use HTTP instead of HTTPS')
+    .option('--database <name>', 'Database name for optional credential storage')
+    .option('--username <user>', 'Username for optional credential storage')
+    .option('--password <pass>', 'Password for optional credential storage')
+    .action(async (options) => {
+      const { ServerCommand } = await import('./cli/server');
+      const globalOpts = program.opts();
+      const cmd = new ServerCommand({
+        action: 'add',
+        name: options.name,
+        host: options.host,
+        port: options.port,
+        secure: options.insecure ? false : true,
+        database: options.database,
+        username: options.username,
+        password: options.password,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
+  serverCmd
+    .command('list')
+    .description('List configured servers')
+    .action(async () => {
+      const { ServerCommand } = await import('./cli/server');
+      const globalOpts = program.opts();
+      const cmd = new ServerCommand({
+        action: 'list',
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
+  serverCmd
+    .command('remove')
+    .description('Remove a server configuration')
+    .requiredOption('--server-id <id>', 'Server ID')
+    .action(async (options) => {
+      const { ServerCommand } = await import('./cli/server');
+      const globalOpts = program.opts();
+      const cmd = new ServerCommand({
+        action: 'remove',
+        serverId: options.serverId,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      const result = await cmd.execute();
+      process.stdout.write(cmd.formatOutput(result) + '\n');
+      process.exit(result.success ? 0 : 1);
+    });
+
   const credentialsCmd = serverCmd
     .command('credentials')
     .description('Manage stored credentials for a server');
