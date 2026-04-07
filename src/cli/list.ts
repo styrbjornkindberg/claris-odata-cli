@@ -10,7 +10,6 @@ import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
-import { OutputFormatter } from '../output/formatter';
 import axios from 'axios';
 
 interface ODataServiceEntry {
@@ -49,11 +48,8 @@ export interface ListOptions extends CommandOptions {
  * Lists configured servers or resources from a FileMaker server.
  */
 export class ListCommand extends BaseCommand<ListOptions> {
-  private formatter: OutputFormatter;
-
   constructor(options: ListOptions) {
     super(options);
-    this.formatter = new OutputFormatter(options.output ?? 'table');
   }
 
   /**
@@ -309,34 +305,5 @@ export class ListCommand extends BaseCommand<ListOptions> {
         error: this.formatError(error),
       };
     }
-  }
-
-  /**
-   * Format output for display
-   *
-   * @param result - Command result
-   * @returns Formatted string
-   */
-  formatOutput(result: CommandResult): string {
-    if (!result.success) {
-      return this.formatter.formatJson({
-        success: false,
-        error: { code: 'ODATA_QUERY_FAILED', message: result.error ?? 'Unknown error' },
-      });
-    }
-
-    // For JSONL format, output one record per line
-    if (
-      this.options.output === 'jsonl' &&
-      result.data &&
-      Array.isArray((result.data as { servers?: unknown[] }).servers)
-    ) {
-      return this.formatter.formatJsonl(
-        (result.data as { servers: Record<string, unknown>[] }).servers
-      );
-    }
-
-    // For JSON or table format
-    return this.formatter.formatJson(result.data);
   }
 }
