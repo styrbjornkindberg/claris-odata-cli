@@ -147,9 +147,11 @@ export class ProfileCommand extends BaseCommand<ProfileOptions> {
 
     if (!result.success) {
       if (isMachine) {
+        // SPEC-009: Structured error format
         return formatter.formatJson({
-          success: false,
-          error: { code: 'COMMAND_FAILED', message: result.error ?? 'Unknown error' },
+          type: 'error',
+          code: 'COMMAND_FAILED',
+          message: result.error ?? 'Unknown error',
         });
       }
       return result.error ?? 'Unknown error';

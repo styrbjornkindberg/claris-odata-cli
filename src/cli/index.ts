@@ -18,37 +18,75 @@ import {
 } from '../api/errors';
 
 /**
- * Error code vocabulary for machine-readable output
+ * Error code vocabulary for machine-readable output (SPEC-009)
  */
 export type ErrorCode =
-  | 'AUTH_FAILED'
-  | 'NOT_FOUND'
-  | 'VALIDATION_ERROR'
-  | 'CONNECTION_ERROR'
+  | 'ODATA_CONNECTION_FAILED'
+  | 'ODATA_AUTH_FAILED'
+  | 'ODATA_QUERY_FAILED'
+  | 'ODATA_TABLE_NOT_FOUND'
+  | 'ODATA_IMPORT_FAILED'
+  | 'ODATA_VALIDATION_ERROR'
   | 'COMMAND_FAILED';
 
 /**
- * Map an error to a stable error code
+ * Error details for structured error output (SPEC-009)
+ */
+export interface ErrorDetails {
+  server?: string;
+  database?: string;
+  table?: string;
+  statusCode?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Structured error output (SPEC-009)
+ */
+export interface StructuredError {
+  type: 'error';
+  code: ErrorCode;
+  message: string;
+  details?: ErrorDetails;
+}
+
+/**
+ * Map an error to a stable error code (SPEC-009)
  */
 function resolveErrorCode(error: unknown): ErrorCode {
   if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
-    return 'AUTH_FAILED';
+    return 'ODATA_AUTH_FAILED';
   }
   if (error instanceof NotFoundError) {
-    return 'NOT_FOUND';
+    return 'ODATA_TABLE_NOT_FOUND';
   }
   if (error instanceof ValidationError) {
-    return 'VALIDATION_ERROR';
+    return 'ODATA_VALIDATION_ERROR';
   }
   if (error instanceof ODataError) {
-    if (error.statusCode === 401 || error.statusCode === 403) return 'AUTH_FAILED';
-    if (error.statusCode === 404) return 'NOT_FOUND';
-    if (error.statusCode === 400) return 'VALIDATION_ERROR';
+    if (error.statusCode === 401 || error.statusCode === 403) return 'ODATA_AUTH_FAILED';
+    if (error.statusCode === 404) return 'ODATA_TABLE_NOT_FOUND';
+    if (error.statusCode === 400) return 'ODATA_VALIDATION_ERROR';
+    return 'ODATA_QUERY_FAILED';
   }
   if (error instanceof Error && /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|timeout/i.test(error.message)) {
-    return 'CONNECTION_ERROR';
+    return 'ODATA_CONNECTION_FAILED';
   }
   return 'COMMAND_FAILED';
+}
+
+/**
+ * Extract error details from an error (SPEC-009)
+ */
+function extractErrorDetails(error: unknown): ErrorDetails | undefined {
+  if (error instanceof ODataError) {
+    const details: ErrorDetails = { statusCode: error.statusCode };
+    if (error.response && typeof error.response === 'object') {
+      details.response = error.response;
+    }
+    return details;
+  }
+  return undefined;
 }
 
 /**
@@ -106,10 +144,13 @@ export abstract class BaseCommand<TOptions extends CommandOptions = CommandOptio
 
       if (!result.success) {
         if (this.isMachineReadable()) {
-          const errorPayload = this.output.formatJson({
-            success: false,
-            error: { code: 'COMMAND_FAILED', message: result.error ?? 'Command failed' },
-          });
+          // SPEC-009: Structured error format
+          const structuredError: StructuredError = {
+            type: 'error',
+            code: 'COMMAND_FAILED',
+            message: result.error ?? 'Command failed',
+          };
+          const errorPayload = this.output.formatJson(structuredError);
           process.stdout.write(`${errorPayload}\n`);
         } else {
           logger.error(result.error ?? 'Command failed');
@@ -126,10 +167,17 @@ export abstract class BaseCommand<TOptions extends CommandOptions = CommandOptio
       const message = error instanceof Error ? error.message : 'Unknown error';
       const code = resolveErrorCode(error);
       if (this.isMachineReadable()) {
-        const errorPayload = this.output.formatJson({
-          success: false,
-          error: { code, message },
-        });
+        // SPEC-009: Structured error format
+        const structuredError: StructuredError = {
+          type: 'error',
+          code,
+          message,
+        };
+        const details = extractErrorDetails(error);
+        if (details) {
+          structuredError.details = details;
+        }
+        const errorPayload = this.output.formatJson(structuredError);
         process.stdout.write(`${errorPayload}\n`);
       } else {
         logger.error(message);

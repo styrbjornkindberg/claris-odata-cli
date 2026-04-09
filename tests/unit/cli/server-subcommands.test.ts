@@ -269,8 +269,9 @@ describe('ServerCommand - subcommands', () => {
       const output = cmd.formatOutput(result);
       const parsed = JSON.parse(output);
 
-      expect(parsed.success).toBe(false);
-      expect(parsed.error.code).toBe('COMMAND_FAILED');
+      // SPEC-009: Structured error format
+      expect(parsed.type).toBe('error');
+      expect(parsed.code).toBe('COMMAND_FAILED');
     });
   });
 });

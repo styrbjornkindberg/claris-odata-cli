@@ -142,9 +142,11 @@ export class GetCommand extends BaseCommand<GetOptions> {
    */
   formatOutput(result: CommandResult): string {
     if (!result.success) {
+      // SPEC-009: Structured error format
       return this.formatter.formatJson({
-        success: false,
-        error: { code: 'ODATA_QUERY_FAILED', message: result.error ?? 'Unknown error' },
+        type: 'error',
+        code: 'ODATA_QUERY_FAILED',
+        message: result.error ?? 'Unknown error',
       });
     }
 

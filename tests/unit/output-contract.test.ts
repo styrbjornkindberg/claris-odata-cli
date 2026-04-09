@@ -68,9 +68,11 @@ describe('Output Contract', () => {
       expect(exitCode).toBe(1);
       const output = captureStdout();
       const parsed = JSON.parse(output);
+      // SPEC-009: Structured error format
       expect(parsed).toEqual({
-        error: { code: 'COMMAND_FAILED', message: 'Something went wrong' },
-        success: false,
+        type: 'error',
+        code: 'COMMAND_FAILED',
+        message: 'Something went wrong',
       });
     });
 
@@ -89,9 +91,10 @@ describe('Output Contract', () => {
       expect(exitCode).toBe(1);
       const output = captureStdout();
       const parsed = JSON.parse(output);
-      expect(parsed.success).toBe(false);
-      expect(parsed.error.code).toBe('CONNECTION_ERROR');
-      expect(parsed.error.message).toBe('Network timeout');
+      // SPEC-009: Structured error format
+      expect(parsed.type).toBe('error');
+      expect(parsed.code).toBe('ODATA_CONNECTION_FAILED');
+      expect(parsed.message).toBe('Network timeout');
     });
 
     it('uses logger.error for table format errors (not JSON)', async () => {
@@ -144,9 +147,10 @@ describe('Output Contract', () => {
       const output = cmd.formatOutput(result);
       const parsed = JSON.parse(output);
 
-      expect(parsed.success).toBe(false);
-      expect(parsed.error).toHaveProperty('code');
-      expect(parsed.error).toHaveProperty('message');
+      // SPEC-009: Structured error format
+      expect(parsed.type).toBe('error');
+      expect(parsed).toHaveProperty('code');
+      expect(parsed).toHaveProperty('message');
     });
 
     it('outputs JSON success with sorted keys', async () => {
@@ -191,14 +195,15 @@ describe('Output Contract', () => {
       const output = cmd.formatOutput(result);
       const parsed = JSON.parse(output);
 
-      expect(parsed.success).toBe(false);
-      expect(parsed.error).toHaveProperty('code');
-      expect(parsed.error).toHaveProperty('message');
+      // SPEC-009: Structured error format
+      expect(parsed.type).toBe('error');
+      expect(parsed).toHaveProperty('code');
+      expect(parsed).toHaveProperty('message');
     });
   });
 
-  describe('error code mapping', () => {
-    it('maps AuthenticationError to AUTH_FAILED', async () => {
+  describe('error code mapping (SPEC-009)', () => {
+    it('maps AuthenticationError to ODATA_AUTH_FAILED', async () => {
       const { BaseCommand } = await import('../../src/cli/index');
       const { AuthenticationError } = await import('../../src/api/errors');
 
@@ -211,10 +216,11 @@ describe('Output Contract', () => {
       const cmd = new AuthFailCommand({ output: 'json' });
       await cmd.run();
       const parsed = JSON.parse(captureStdout());
-      expect(parsed.error.code).toBe('AUTH_FAILED');
+      expect(parsed.type).toBe('error');
+      expect(parsed.code).toBe('ODATA_AUTH_FAILED');
     });
 
-    it('maps NotFoundError to NOT_FOUND', async () => {
+    it('maps NotFoundError to ODATA_TABLE_NOT_FOUND', async () => {
       const { BaseCommand } = await import('../../src/cli/index');
       const { NotFoundError } = await import('../../src/api/errors');
 
@@ -227,10 +233,11 @@ describe('Output Contract', () => {
       const cmd = new NotFoundCommand({ output: 'json' });
       await cmd.run();
       const parsed = JSON.parse(captureStdout());
-      expect(parsed.error.code).toBe('NOT_FOUND');
+      expect(parsed.type).toBe('error');
+      expect(parsed.code).toBe('ODATA_TABLE_NOT_FOUND');
     });
 
-    it('maps ValidationError to VALIDATION_ERROR', async () => {
+    it('maps ValidationError to ODATA_VALIDATION_ERROR', async () => {
       const { BaseCommand } = await import('../../src/cli/index');
       const { ValidationError } = await import('../../src/api/errors');
 
@@ -243,10 +250,11 @@ describe('Output Contract', () => {
       const cmd = new ValidateFailCommand({ output: 'json' });
       await cmd.run();
       const parsed = JSON.parse(captureStdout());
-      expect(parsed.error.code).toBe('VALIDATION_ERROR');
+      expect(parsed.type).toBe('error');
+      expect(parsed.code).toBe('ODATA_VALIDATION_ERROR');
     });
 
-    it('maps ODataError with 401 status to AUTH_FAILED', async () => {
+    it('maps ODataError with 401 status to ODATA_AUTH_FAILED', async () => {
       const { BaseCommand } = await import('../../src/cli/index');
       const { ODataError } = await import('../../src/api/errors');
 
@@ -259,10 +267,11 @@ describe('Output Contract', () => {
       const cmd = new OData401Command({ output: 'json' });
       await cmd.run();
       const parsed = JSON.parse(captureStdout());
-      expect(parsed.error.code).toBe('AUTH_FAILED');
+      expect(parsed.type).toBe('error');
+      expect(parsed.code).toBe('ODATA_AUTH_FAILED');
     });
 
-    it('maps ECONNREFUSED to CONNECTION_ERROR', async () => {
+    it('maps ECONNREFUSED to ODATA_CONNECTION_FAILED', async () => {
       const { BaseCommand } = await import('../../src/cli/index');
 
       class ConnRefusedCommand extends BaseCommand {
@@ -274,7 +283,8 @@ describe('Output Contract', () => {
       const cmd = new ConnRefusedCommand({ output: 'json' });
       await cmd.run();
       const parsed = JSON.parse(captureStdout());
-      expect(parsed.error.code).toBe('CONNECTION_ERROR');
+      expect(parsed.type).toBe('error');
+      expect(parsed.code).toBe('ODATA_CONNECTION_FAILED');
     });
 
     it('maps generic errors to COMMAND_FAILED', async () => {
@@ -289,7 +299,8 @@ describe('Output Contract', () => {
       const cmd = new GenericFailCommand({ output: 'json' });
       await cmd.run();
       const parsed = JSON.parse(captureStdout());
-      expect(parsed.error.code).toBe('COMMAND_FAILED');
+      expect(parsed.type).toBe('error');
+      expect(parsed.code).toBe('COMMAND_FAILED');
     });
   });
 
