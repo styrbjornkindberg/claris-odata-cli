@@ -237,6 +237,22 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Overview command
+  program
+    .command('overview')
+    .description('Dashboard showing configured servers, databases, and table counts')
+    .option('--detailed', 'Show table names for each database')
+    .action(async (options) => {
+      const { OverviewCommand } = await import('./cli/overview');
+      const globalOpts = program.opts();
+      const cmd = new OverviewCommand({
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+        detailed: options.detailed ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
   // Browse command
   program
     .command('browse')
