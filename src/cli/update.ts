@@ -27,6 +27,8 @@ export interface UpdateOptions extends CommandOptions {
   recordId: number;
   /** Field values to update */
   data: Record<string, unknown>;
+  /** Use PUT (full replace) instead of PATCH (partial update) */
+  replace?: boolean;
 }
 
 /**
@@ -89,11 +91,9 @@ export class UpdateCommand extends BaseCommand<UpdateOptions> {
         authToken,
       });
 
-      const updated = await client.updateRecord(
-        this.options.table,
-        this.options.recordId,
-        this.options.data
-      );
+      const updated = this.options.replace
+        ? await client.replaceRecord(this.options.table, this.options.recordId, this.options.data)
+        : await client.updateRecord(this.options.table, this.options.recordId, this.options.data);
 
       return {
         success: true,

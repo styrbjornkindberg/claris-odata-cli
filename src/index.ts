@@ -164,6 +164,7 @@ function createProgram(): Command {
     .requiredOption('-s, --server <id>', 'Server ID')
     .requiredOption('-d, --database <name>', 'Database name')
     .requiredOption('--data <json>', 'Record data as JSON')
+    .option('--replace', 'Replace record (PUT) instead of partial update (PATCH)')
     .action(async (table: string, recordId: string, options) => {
       const { UpdateCommand } = await import('./cli/update');
       const globalOpts = program.opts();
@@ -181,6 +182,7 @@ function createProgram(): Command {
         serverId: options.server ?? globalOpts.server,
         database: options.database ?? globalOpts.database,
         data,
+        replace: options.replace === true,
         output: globalOpts.format as OutputFormat,
         verbose: globalOpts.verbose ?? false,
       });

@@ -262,6 +262,24 @@ export class ODataClient {
   }
 
   /**
+   * Replace a record (full PUT — replaces all fields)
+   *
+   * @param tableName - FileMaker table name
+   * @param recordId - Record ID
+   * @param data - Full record data
+   * @returns Replaced record
+   */
+  async replaceRecord<T = unknown>(
+    tableName: string,
+    recordId: number,
+    data: Record<string, unknown>
+  ): Promise<T> {
+    const url = `/fmi/odata/v4/${this.database}/${tableName}(${recordId})`;
+    const response = await this.http.put<T>(url, data);
+    return response.data;
+  }
+
+  /**
    * Delete a record
    *
    * @param tableName - FileMaker table name

@@ -16,6 +16,7 @@ describe('ODataClient', () => {
   const mockGet = vi.fn();
   const mockPost = vi.fn();
   const mockPatch = vi.fn();
+  const mockPut = vi.fn();
   const mockDelete = vi.fn();
   let interceptorErrorHandler: (error: unknown) => never;
 
@@ -23,6 +24,7 @@ describe('ODataClient', () => {
     get: mockGet,
     post: mockPost,
     patch: mockPatch,
+    put: mockPut,
     delete: mockDelete,
     interceptors: {
       response: {
@@ -224,6 +226,19 @@ describe('ODataClient', () => {
 
       expect(mockPatch).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers(5)', data);
       expect(result).toEqual({ id: 5, Name: 'Updated' });
+    });
+  });
+
+  describe('replaceRecord', () => {
+    it('puts data at the correct URL', async () => {
+      const client = createClient();
+      const data = { Name: 'Replaced' };
+      mockPut.mockResolvedValue({ data: { id: 5, Name: 'Replaced' } });
+
+      const result = await client.replaceRecord('Customers', 5, data);
+
+      expect(mockPut).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers(5)', data);
+      expect(result).toEqual({ id: 5, Name: 'Replaced' });
     });
   });
 
