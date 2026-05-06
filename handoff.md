@@ -1,120 +1,111 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-Picking this up cold? Read this first. Five minutes max.
-
-**Date:** 2026-05-06
-**Branch:** `main` (no branch cut yet — first task should branch off)
+**Date:** 2026-05-06 (session 2)
+**Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
-**Owner:** styrbjorn.kindberg@squaremoon.se
 
 ## Where We Are
 
-Just finished the **specify** and **plan** phases of spec-driven development against the FileMaker OData docs at https://help.claris.com/en/odata-guide/. Code review is done, spec is approved scope-wise ("All features"), implementation plan written.
+Phase 1 complete. T1 + T2 done, Checkpoint A passed. Starting next session at **T3**.
 
-**No code has been touched yet.** Next session = start executing T1.
+Node version needed: **20** (`nvm use 20`). Default shell has v10 active.
 
-## Three Files To Read First
+## What Landed This Session
 
-1. **[`SPEC.md`](SPEC.md)** — the contract. Objective, tech stack, commands, structure, code style, testing strategy, boundaries, success criteria. Source of truth.
-2. **[`tasks/plan.md`](tasks/plan.md)** — the implementation plan. 12 tasks, 5 phases, 4 checkpoints, dependency graph, risks, parallelization seam.
-3. **[`tasks/todo.md`](tasks/todo.md)** — single-page checklist. Tick boxes as you go.
+### T1 — Protocol detection fix (commit `b97074f`)
+- `list.ts`, `health.ts`, `overview.ts` all used `port === 443 ? 'https' : 'http'`
+- Fixed to `(server.secure ?? true) ? 'https' : 'http'` in all three
+- Added `secure?: boolean` to `checkServer` param type in `health.ts`
+- 12 new tests: `tests/unit/cli/protocol-detection.test.ts`
+- Fixed pre-existing overview.test.ts that encoded the buggy behavior
 
-Optional context: the original code-review findings live in the conversation transcript — every finding is mapped to a Success Criterion in `SPEC.md` § Success Criteria.
+### T2 — Typed error subclasses (commit `0822db3`)
+- `handleApiError` now switches on status: 401→`AuthenticationError`, 403→`AuthorizationError`, 404→`NotFoundError`, 400→`ValidationError`, 429→`RateLimitError` (parses `Retry-After` header), else→`ODataError`
+- 8 new tests: `tests/unit/api/client-errors.test.ts`
 
-## What This Sweep Is
+### Checkpoint A (commit `36b24d1`)
+- 34 test files, 485 tests, 0 lint errors. Green.
 
-Twelve vertical slices that close every code-review finding **and** ship the FileMaker OData capabilities the CLI advertises but doesn't expose:
+## Start Here: T3
 
-- Bug: protocol detection uses `port === 443` instead of `secure` flag (3 commands)
-- Bug: `client.handleApiError` always throws bare `ODataError`, never the typed subclasses
-- Bug: `getRecords` discards `@odata.count`
-- Missing: `Prefer: fmodata.include-specialcolumns` (so `__Id`/`__ModId` actually populate)
-- Missing: `Accept: …;IEEE754Compatible=true` (large ID precision)
-- Missing CLI commands: `fmo script`, `fmo upload`, `fmo batch`
-- Missing flags: `--expand` on `get`, `--replace` (PUT) on `update`
-- Cleanup: `EndpointBuilder` is dead code; commands hand-roll URLs; `formatError` duplicated 3x; unsafe `as HttpErrorShape` casts; redundant filter in `browse.ts`
+**Task:** Adopt `EndpointBuilder` as single URL source. Commands migrate off inline `axios`.
+
+**Acceptance:**
+- No command imports `axios` directly (except `client.ts`)
+- `EndpointBuilder` has methods for every URL the CLI constructs
+- `ODataClient` exposes `getServiceDocument()` + `getMetadata()` so `list`/`schema` drop their inline calls
+
+**Files to touch:**
+- `src/api/endpoints.ts` — already has most builder methods; needs `serviceDocument()` + `batch()` added; also needs to accept port in constructor
+- `src/api/client.ts` — add `getServiceDocument()` + `getMetadata()` methods
+- `src/cli/list.ts` — drop direct axios, use `ODataClient.getServiceDocument()` + `getMetadata()`
+- `src/cli/schema.ts` — drop direct axios, use `ODataClient.getMetadata()`
+- `src/cli/health.ts` — drop direct axios, use `ODataClient.getServiceDocument()`
+- `src/cli/overview.ts` — drop direct axios, use `ODataClient.getServiceDocument()` + `getMetadata()`
+- `src/cli/browse.ts` — `fetchDatabases` + `fetchTables` + `executeAction` (view-schema) all use axios directly; migrate to `ODataClient`
+- `tests/unit/api/endpoints.test.ts` — extend with new builder methods
+
+**Key context already read this session:**
+- `endpoints.ts` current state: has `metadata()`, `tables()`, `table()`, `record()`, `createRecord()`, `script()`, `container()` — missing `serviceDocument()` (root `/fmi/odata/v4/`) and `batch()`
+- `EndpointBuilder` constructor takes `(host, database, useHttps)` — no port. Add port param.
+- `browse.ts:fetchDatabases` calls `/fmi/odata/v4` (no database suffix) — that's the service document for the server root, not database-scoped
+- `browse.ts:fetchTables` calls `/fmi/odata/v4/{database}` — database-scoped service document
+- `browse.ts:executeAction` case `view-schema` uses inline axios for metadata
+- `list.ts:listDatabases` calls `/fmi/odata/v4/` (service document)
+- `list.ts:listTables` calls `/{db}/$metadata` XML
+- `health.ts:checkServer` calls `/fmi/odata/v4/` (service document)
+- `overview.ts` calls service document then `/{db}/$metadata` for each db
+
+**Approach for T3:**
+1. Add port to `EndpointBuilder` constructor
+2. Add `serviceDocument()` method (returns `/fmi/odata/v4/` — no database)
+3. Add `batch()` method
+4. Add `getServiceDocument()` + `getMetadata()` to `ODataClient`
+5. Migrate each command, one by one
+6. Verify `grep -rE "axios\." src/cli` returns nothing
+
+**Tricky bit:** `list.ts` + `health.ts` + `overview.ts` build their own axios calls because they don't have access to `ODataClient` — they construct one ad-hoc. Migrate them to instantiate `ODataClient` the same way `get.ts` does.
+
+**browse.ts** is the biggest one — `fetchDatabases`/`fetchTables` use axios directly and build their own auth header. These should delegate to `ODataClient` methods. `executeAction view-schema` also needs to go through the client.
+
+**Test strategy:** Write failing tests for new `ODataClient` methods first, then migrate commands. Existing command tests mock axios — update them to mock `ODataClient` methods instead after migration.
+
+## Checkpoint B (after T3, T4, T5)
+- All commands use `ODataClient` (no direct `axios` in `cli/`)
+- Prefer + Accept headers verified
+- `fmo get --count` works
+- Human review before Phase 3
 
 ## Decisions Already Locked In
+(unchanged from session 1 — see SPEC.md for full list)
 
-These came out of the spec/plan dialogue. Don't relitigate without a reason.
+- `EndpointBuilder` = single URL source
+- `Prefer` first-class via `src/api/prefer.ts`
+- `getRecords` → `QueryResult<T>` (breaking, major bump)
+- `handleApiError` → typed subclasses ✅ done
+- Batch input = JSON DSL → multipart
+- Container download out of scope
 
-- **`EndpointBuilder` becomes the single URL source.** Adopted everywhere — no more inline `axios` in `cli/`.
-- **`Prefer` is a first-class concern via new `src/api/prefer.ts`.** `fmodata.include-specialcolumns` always-on. `IEEE754Compatible=true` always-on.
-- **`getRecords` return shape changes to `QueryResult<T>`** (`{records, count, nextLink}`). Breaking. Justified by the `@odata.count` data loss bug. Bump major version.
-- **`handleApiError` throws typed subclasses** — `AuthenticationError`, `AuthorizationError`, `NotFoundError`, `ValidationError`, `RateLimitError`. Existing status-code fallback in `cli/index.ts:resolveErrorCode` keeps working unchanged.
-- **Batch input format = JSON DSL we transcode to `multipart/mixed`.** Friendlier than raw multipart.
-- **Container download out of scope this sweep.** Follow-up.
-- **Schema-modification verbs (POST table, etc.) out of scope this sweep.** Follow-up.
-- **Container upload buffered with 25 MB cap.** Revisit if users hit it.
+## Hard Rules
+- Never `any` or `as` to silence types
+- Never disable a failing test
+- Never `git push --force` or `--no-verify`
+- Never log passwords or full auth headers
+- Don't change keychain account-key format
 
-## What "Done" Looks Like
-
-`SPEC.md` § Success Criteria has the exhaustive list. The short version:
-
-- `npm test && npm run lint` green
-- Coverage ≥ 80% overall, 100% on `api/client.ts` + `api/prefer.ts`
-- Manual smoke against a real FileMaker Cloud: `list`, `get --count`, `get --expand`, `script`, `upload`, `batch`
-- Records returned by `get` always have `__Id` / `__ModId`
-- HTTPS works on non-443 ports
-
-## Start Here
-
-Open [`tasks/todo.md`](tasks/todo.md). First box: **T1 — Fix protocol detection across `list` / `health` / `overview`**.
-
-Suggested kickoff:
-
+## Todo State
 ```
-git checkout -b feature/odata-conformance-sweep
+Phase 1: ✅ T1 ✅ T2 ✅ Checkpoint A
+Phase 2: ⬜ T3 ⬜ T4 ⬜ T5 ⬜ Checkpoint B
+Phase 3: ⬜ T6 ⬜ T7
+Phase 4: ⬜ T8 ⬜ T9 ⬜ T10 ⬜ Checkpoint C
+Phase 5: ⬜ T11 ⬜ T12 ⬜ Checkpoint D
 ```
 
-Then execute T1 per [`tasks/plan.md`](tasks/plan.md) § Task 1. It's S-sized (3 files + 1 test), no API change, fast win to build momentum and validate the test setup.
-
-After T1 + T2: hit **Checkpoint A** before continuing into Phase 2 (which has breaking changes).
-
-## Recommended Skills For Next Session
-
-- **`superpowers:test-driven-development`** — every task has a verification step; write the failing test first
-- **`agent-skills:incremental-implementation`** — one task, one commit, verify, repeat
-- **`agent-skills:context-engineering`** — load only the spec section + source files for the current task; don't flood the agent with the whole repo
-
-## Open Questions Carrying Forward
-
-1. **Always-on `IEEE754Compatible=true`** returns `Edm.Int64` as a string. Document loudly in the PR description; monitor first user feedback. Fallback: env-var opt-out.
-2. **Multipart batch parsing** may have FileMaker-specific quirks. Build with golden fixtures from real responses, defer if it bloats T10.
-3. **Major version bump** in `package.json` on first publish after the `getRecords` shape change. Note in CHANGELOG.
-
-## What NOT To Do
-
-Hard rules carried from `SPEC.md` § Boundaries:
-
-- Never log passwords or full Authorization headers
-- Never use `any` or `as` to silence type errors
-- Never disable a failing test instead of fixing it
-- Never use `git push --force` or `--no-verify`
-- Don't change keychain account-key format without asking — it breaks existing users
-- Don't rename or remove existing CLI flags without asking
-
-## Parallelization Hint
-
-Two-agent split is documented in [`tasks/plan.md`](tasks/plan.md) § Parallelization. Agent B blocks on Agent A's T3 (EndpointBuilder adoption); after that, lanes are independent. If running solo, follow the linear order in `tasks/todo.md`.
-
-## Repo State Snapshot
-
+## Repo State
 ```
-Working tree:
-  ?? .claude/settings.local.json
-  ?? CLAUDE_CODE_BRIEF.md
-  ?? SPEC.md            ← created this session
-  ?? handoff.md         ← this file
-  ?? tasks/plan.md      ← created this session
-  ?? tasks/todo.md      ← created this session
-
-Recent commits (untouched by this session):
-  9569146 feat: add fmo overview command (CLA-1855)
-  db18ac9 test: add comprehensive format mode tests for all commands
-  0730fda test: add tests for all format modes (CLA-1865)
-  16a41ed feat: add structured error formatter with SPEC-009 codes
-  1479085 refactor(list): remove dead formatOutput code from ListCommand
+Branch: feature/odata-conformance-sweep
+Last commit: 36b24d1 chore: tick T1, T2, Checkpoint A in todo
+Tests: 34 files, 485 passing
+Lint: 0 errors, 49 warnings (all pre-existing explicit-return-type in test files)
 ```
-
-Nothing committed yet from this session. First commit of next session should bundle `SPEC.md` + `tasks/plan.md` + `tasks/todo.md` + `handoff.md` as a `docs:` commit, then branch into T1.
