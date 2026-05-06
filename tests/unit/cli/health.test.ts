@@ -96,7 +96,7 @@ describe('HealthCommand', () => {
         { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockGetServiceDocument.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:443'));
+      mockGetServiceDocument.mockRejectedValue(new ODataError('connect ECONNREFUSED 127.0.0.1:443', 500));
 
       const cmd = new HealthCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -113,7 +113,7 @@ describe('HealthCommand', () => {
         { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockGetServiceDocument.mockRejectedValue(new Error('connect ETIMEDOUT 10.0.0.1:443'));
+      mockGetServiceDocument.mockRejectedValue(new ODataError('connect ETIMEDOUT 10.0.0.1:443', 500));
 
       const cmd = new HealthCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -131,7 +131,7 @@ describe('HealthCommand', () => {
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
       mockGetServiceDocument.mockRejectedValue(
-        new Error('getaddrinfo ENOTFOUND fm.example.com')
+        new ODataError('getaddrinfo ENOTFOUND fm.example.com', 500)
       );
 
       const cmd = new HealthCommand({ output: 'table' });
@@ -336,7 +336,7 @@ describe('HealthCommand', () => {
         { serverId: 's1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockGetServiceDocument.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:443'));
+      mockGetServiceDocument.mockRejectedValue(new ODataError('connect ECONNREFUSED 127.0.0.1:443', 500));
 
       const exitCode = await new HealthCommand({ output: 'table' }).run();
       expect(exitCode).toBe(1);

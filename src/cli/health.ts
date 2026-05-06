@@ -141,16 +141,18 @@ export class HealthCommand {
     if (error instanceof AuthorizationError) return 'Authorization failed';
     if (error instanceof NotFoundError) return 'Database not found';
     if (error instanceof ODataError) {
-      if (error.statusCode === 500) return 'Server error';
+      if (error.statusCode === 500) {
+        const msg = error.message;
+        if (msg.includes('ECONNREFUSED')) return 'Connection refused';
+        if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
+        if (msg.includes('ENOTFOUND')) return 'Host not found';
+        if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
+        return 'Server error';
+      }
       return error.message;
     }
     if (error instanceof Error) {
-      const msg = error.message;
-      if (msg.includes('ECONNREFUSED')) return 'Connection refused';
-      if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
-      if (msg.includes('ENOTFOUND')) return 'Host not found';
-      if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
-      return msg;
+      return error.message;
     }
     return 'Unknown error';
   }
