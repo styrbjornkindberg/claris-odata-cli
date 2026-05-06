@@ -207,6 +207,41 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Script command
+  program
+    .command('script <name>')
+    .description('Run a FileMaker script')
+    .requiredOption('-s, --server <id>', 'Server ID')
+    .requiredOption('-d, --database <name>', 'Database name')
+    .option('--table <name>', 'Table context for the script')
+    .option('--id <n>', 'Record ID context', parseInt)
+    .option('--params <json>', 'Script parameter as JSON')
+    .action(async (name: string, options) => {
+      const { ScriptCommand } = await import('./cli/script');
+      const globalOpts = program.opts();
+      let params: unknown;
+      if (options.params) {
+        try {
+          params = JSON.parse(options.params);
+        } catch {
+          logger.error('Invalid JSON for --params');
+          process.exit(1);
+          return;
+        }
+      }
+      const cmd = new ScriptCommand({
+        name,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        table: options.table,
+        id: options.id,
+        params,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
   // Schema command
   program
     .command('schema [table]')

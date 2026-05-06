@@ -238,6 +238,79 @@ describe('ODataClient', () => {
     });
   });
 
+  describe('runScript', () => {
+    it('posts to the database-level script URL when no table given', async () => {
+      const client = createClient();
+      mockPost.mockResolvedValue({ data: { scriptResult: 0 } });
+
+      await client.runScript('MyScript');
+
+      expect(mockPost).toHaveBeenCalledWith(
+        "/fmi/odata/v4/TestDB/Script('MyScript')",
+        {}
+      );
+    });
+
+    it('posts to the table-level script URL when table is given', async () => {
+      const client = createClient();
+      mockPost.mockResolvedValue({ data: { scriptResult: 0 } });
+
+      await client.runScript('MyScript', { table: 'Customers' });
+
+      expect(mockPost).toHaveBeenCalledWith(
+        "/fmi/odata/v4/TestDB/Customers/Script('MyScript')",
+        {}
+      );
+    });
+
+    it('posts to the record-level script URL when table and recordId are given', async () => {
+      const client = createClient();
+      mockPost.mockResolvedValue({ data: { scriptResult: 0 } });
+
+      await client.runScript('MyScript', { table: 'Customers', recordId: 5 });
+
+      expect(mockPost).toHaveBeenCalledWith(
+        "/fmi/odata/v4/TestDB/Customers(5)/Script('MyScript')",
+        {}
+      );
+    });
+
+    it('sends scriptParameterValue when params provided', async () => {
+      const client = createClient();
+      mockPost.mockResolvedValue({ data: { scriptResult: 0 } });
+      const params = { key: 'val' };
+
+      await client.runScript('MyScript', { params });
+
+      expect(mockPost).toHaveBeenCalledWith(
+        "/fmi/odata/v4/TestDB/Script('MyScript')",
+        { scriptParameterValue: params }
+      );
+    });
+
+    it('sends empty body when no params provided', async () => {
+      const client = createClient();
+      mockPost.mockResolvedValue({ data: { scriptResult: 0 } });
+
+      await client.runScript('MyScript');
+
+      expect(mockPost).toHaveBeenCalledWith(
+        "/fmi/odata/v4/TestDB/Script('MyScript')",
+        {}
+      );
+    });
+
+    it('returns response data', async () => {
+      const client = createClient();
+      const responseData = { scriptResult: 0, scriptResultDetail: 'OK' };
+      mockPost.mockResolvedValue({ data: responseData });
+
+      const result = await client.runScript('MyScript');
+
+      expect(result).toEqual(responseData);
+    });
+  });
+
   describe('error handling', () => {
     it('throws ODataError with status and message from API response', () => {
       createClient();

@@ -271,4 +271,29 @@ export class ODataClient {
     const url = `/fmi/odata/v4/${this.database}/${tableName}(${recordId})`;
     await this.http.delete(url);
   }
+
+  /**
+   * Run a FileMaker script
+   *
+   * @param scriptName - Script name
+   * @param options - Optional table context, record ID context, and script parameters
+   * @returns Raw response data
+   */
+  async runScript(
+    scriptName: string,
+    options?: { table?: string; recordId?: number; params?: unknown }
+  ): Promise<unknown> {
+    let url: string;
+    if (options?.table && options.recordId !== undefined) {
+      url = `/fmi/odata/v4/${this.database}/${options.table}(${options.recordId})/Script('${scriptName}')`;
+    } else if (options?.table) {
+      url = `/fmi/odata/v4/${this.database}/${options.table}/Script('${scriptName}')`;
+    } else {
+      url = `/fmi/odata/v4/${this.database}/Script('${scriptName}')`;
+    }
+
+    const body = options?.params !== undefined ? { scriptParameterValue: options.params } : {};
+    const response = await this.http.post<unknown>(url, body);
+    return response.data;
+  }
 }
