@@ -57,7 +57,7 @@ describe('GetCommand', () => {
 
     mockCredentialsManager.getCredentials.mockResolvedValue('secret');
     mockAuthManager.createBasicAuthToken.mockReturnValue('Basic dGVzdA==');
-    mockClient.getRecords.mockResolvedValue([{ id: 1, name: 'Record 1' }]);
+    mockClient.getRecords.mockResolvedValue({ records: [{ id: 1, name: 'Record 1' }] });
   });
 
   it('uses username from stored credential entry for auth', async () => {

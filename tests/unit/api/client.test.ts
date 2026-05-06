@@ -87,7 +87,17 @@ describe('ODataClient', () => {
       const result = await client.getRecords('Customers');
 
       expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers', expect.anything());
-      expect(result).toEqual([{ id: 1 }]);
+      expect(result).toEqual({ records: [{ id: 1 }], count: undefined, nextLink: undefined });
+    });
+
+    it('includes count from @odata.count when count option is true', async () => {
+      const client = createClient();
+      mockGet.mockResolvedValue({ data: { value: [{ id: 1 }], '@odata.count': 3 } });
+
+      const result = await client.getRecords('Customers', { count: true });
+
+      expect(result.count).toBe(3);
+      expect(result.records).toHaveLength(1);
     });
 
     it('appends $filter query parameter', async () => {

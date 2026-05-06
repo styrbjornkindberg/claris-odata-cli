@@ -147,7 +147,7 @@ describe('BrowseCommand - action menu (CLA-1838)', () => {
 
   describe('executeAction()', () => {
     it('list-records: calls ODataClient.getRecords and returns records', async () => {
-      const mockGetRecords = vi.fn().mockResolvedValue([{ id: 1, name: 'Alice' }]);
+      const mockGetRecords = vi.fn().mockResolvedValue({ records: [{ id: 1, name: 'Alice' }] });
       vi.spyOn(ODataClient.prototype, 'getRecords').mockImplementation(mockGetRecords);
 
       const cmd = new BrowseCommand({});

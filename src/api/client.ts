@@ -18,7 +18,7 @@ import {
   ValidationError,
 } from './errors';
 import { buildPreferHeader, type PreferOptions } from './prefer';
-import type { QueryOptions } from '../types';
+import type { ODataCollection, QueryResult, QueryOptions } from '../types';
 
 /**
  * Configuration for the OData client
@@ -194,15 +194,19 @@ export class ODataClient {
     tableName: string,
     options?: QueryOptions,
     prefer?: PreferOptions
-  ): Promise<T[]> {
+  ): Promise<QueryResult<T>> {
     const query = this.buildQueryString(options);
     const url = `/fmi/odata/v4/${this.database}/${tableName}${query}`;
     const preferHeaders = buildPreferHeader({ ...this.defaultPrefer, ...prefer });
 
-    const response = await this.http.get<{ value: T[] }>(url, {
+    const response = await this.http.get<ODataCollection<T>>(url, {
       headers: { Accept: ACCEPT_RECORDS, ...preferHeaders },
     });
-    return response.data.value;
+    return {
+      records: response.data.value,
+      count: response.data['@odata.count'],
+      nextLink: response.data['@odata.nextLink'],
+    };
   }
 
   /**

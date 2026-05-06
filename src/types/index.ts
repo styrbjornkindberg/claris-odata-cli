@@ -101,6 +101,26 @@ export interface QueryOptions {
 }
 
 /**
+ * Paginated collection response from OData endpoint
+ */
+export interface ODataCollection<T> {
+  value: T[];
+  '@odata.count'?: number;
+  '@odata.nextLink'?: string;
+}
+
+/**
+ * Structured result returned by getRecords
+ */
+export interface QueryResult<T> {
+  records: T[];
+  /** Populated when options.count === true */
+  count?: number;
+  /** @odata.nextLink if present */
+  nextLink?: string;
+}
+
+/**
  * FileMaker record representation
  */
 export interface Record {

@@ -316,8 +316,8 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
 
     switch (action) {
       case 'list-records': {
-        const records = await client.getRecords(table);
-        return { success: true, data: records };
+        const result = await client.getRecords(table);
+        return { success: true, data: result.records };
       }
 
       case 'get-record': {

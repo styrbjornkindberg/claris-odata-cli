@@ -105,10 +105,12 @@ function createProgram(): Command {
     .option('--skip <n>', 'Records to skip', parseInt)
     .option('--orderby <field>', 'Order by field')
     .option('--count', 'Include total count')
+    .option('--expand <entities>', 'Expand related entities (comma-separated)')
     .action(async (table: string, options) => {
       const { GetCommand } = await import('./cli/get');
       const globalOpts = program.opts();
       const select = options.select ? options.select.split(',') : undefined;
+      const expand = options.expand ? options.expand.split(',') : undefined;
       const cmd = new GetCommand({
         table,
         serverId: options.server ?? globalOpts.server,
@@ -119,6 +121,7 @@ function createProgram(): Command {
         skip: options.skip,
         orderby: options.orderby,
         count: options.count,
+        expand,
         output: globalOpts.format as OutputFormat,
         verbose: globalOpts.verbose ?? false,
       });

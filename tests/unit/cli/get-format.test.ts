@@ -66,10 +66,9 @@ describe('GetCommand - format modes', () => {
 
   describe('formatOutput - json mode', () => {
     it('formats records as JSON array', async () => {
-      mockClient.getRecords.mockResolvedValue([
-        { id: 1, name: 'Alice' },
-        { id: 2, name: 'Bob' },
-      ]);
+      mockClient.getRecords.mockResolvedValue({
+        records: [{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }],
+      });
 
       const cmd = new GetCommand({
         table: 'Customers',
@@ -89,7 +88,7 @@ describe('GetCommand - format modes', () => {
     });
 
     it('sorts keys alphabetically in JSON output', async () => {
-      mockClient.getRecords.mockResolvedValue([{ zebra: 'z', apple: 'a', banana: 'b' }]);
+      mockClient.getRecords.mockResolvedValue({ records: [{ zebra: 'z', apple: 'a', banana: 'b' }] });
 
       const cmd = new GetCommand({
         table: 'Test',
@@ -127,11 +126,13 @@ describe('GetCommand - format modes', () => {
 
   describe('formatOutput - jsonl mode', () => {
     it('formats records as JSON Lines (one per line)', async () => {
-      mockClient.getRecords.mockResolvedValue([
-        { id: 1, name: 'Alice' },
-        { id: 2, name: 'Bob' },
-        { id: 3, name: 'Charlie' },
-      ]);
+      mockClient.getRecords.mockResolvedValue({
+        records: [
+          { id: 1, name: 'Alice' },
+          { id: 2, name: 'Bob' },
+          { id: 3, name: 'Charlie' },
+        ],
+      });
 
       const cmd = new GetCommand({
         table: 'Customers',
@@ -151,7 +152,7 @@ describe('GetCommand - format modes', () => {
     });
 
     it('each line is valid JSON with sorted keys', async () => {
-      mockClient.getRecords.mockResolvedValue([{ zebra: 'z', apple: 'a' }]);
+      mockClient.getRecords.mockResolvedValue({ records: [{ zebra: 'z', apple: 'a' }] });
 
       const cmd = new GetCommand({
         table: 'Test',
@@ -169,7 +170,7 @@ describe('GetCommand - format modes', () => {
     });
 
     it('outputs empty string for empty result set', async () => {
-      mockClient.getRecords.mockResolvedValue([]);
+      mockClient.getRecords.mockResolvedValue({ records: [] });
 
       const cmd = new GetCommand({
         table: 'Customers',
@@ -204,9 +205,9 @@ describe('GetCommand - format modes', () => {
     });
 
     it('handles complex nested objects', async () => {
-      mockClient.getRecords.mockResolvedValue([
-        { id: 1, nested: { key: 'value', inner: { deep: true } } },
-      ]);
+      mockClient.getRecords.mockResolvedValue({
+        records: [{ id: 1, nested: { key: 'value', inner: { deep: true } } }],
+      });
 
       const cmd = new GetCommand({
         table: 'Test',
@@ -226,9 +227,7 @@ describe('GetCommand - format modes', () => {
 
   describe('formatOutput - table mode', () => {
     it('formats records as JSON (table mode uses JSON for get)', async () => {
-      mockClient.getRecords.mockResolvedValue([
-        { id: 1, name: 'Alice' },
-      ]);
+      mockClient.getRecords.mockResolvedValue({ records: [{ id: 1, name: 'Alice' }] });
 
       const cmd = new GetCommand({
         table: 'Customers',
@@ -247,9 +246,7 @@ describe('GetCommand - format modes', () => {
 
   describe('formatOutput - csv mode', () => {
     it('formats records as JSON (csv mode uses JSON for get)', async () => {
-      mockClient.getRecords.mockResolvedValue([
-        { id: 1, name: 'Alice' },
-      ]);
+      mockClient.getRecords.mockResolvedValue({ records: [{ id: 1, name: 'Alice' }] });
 
       const cmd = new GetCommand({
         table: 'Customers',

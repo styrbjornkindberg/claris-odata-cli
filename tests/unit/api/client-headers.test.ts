@@ -117,7 +117,7 @@ describe('ODataClient – Prefer + Accept headers (T4)', () => {
       const client = createClient();
       const result = await client.getRecords('Contacts');
 
-      expect(result).toEqual(rows);
+      expect(result).toEqual({ records: rows, count: undefined, nextLink: undefined });
     });
   });
 

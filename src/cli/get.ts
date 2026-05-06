@@ -36,6 +36,8 @@ export interface GetOptions extends CommandOptions {
   orderby?: string;
   /** Include total count */
   count?: boolean;
+  /** Expand related entities */
+  expand?: string[];
 }
 
 /**
@@ -117,13 +119,16 @@ export class GetCommand extends BaseCommand<GetOptions> {
       if (this.options.skip !== undefined) queryOptions.skip = this.options.skip;
       if (this.options.orderby) queryOptions.orderby = this.options.orderby;
       if (this.options.count) queryOptions.count = true;
+      if (this.options.expand) queryOptions.expand = this.options.expand;
 
       // Execute query
-      const records = await client.getRecords(this.options.table, queryOptions);
+      const result = await client.getRecords(this.options.table, queryOptions);
 
       return {
         success: true,
-        data: records,
+        data: this.options.count
+          ? { records: result.records, count: result.count }
+          : result.records,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
