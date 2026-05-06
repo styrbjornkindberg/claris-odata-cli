@@ -1,12 +1,12 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-**Date:** 2026-05-06 (session 2)
+**Date:** 2026-05-06 (session 3)
 **Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
 
 ## Where We Are
 
-Phase 1 complete. T1 + T2 done, Checkpoint A passed. Starting next session at **T3**.
+Phase 1 + T3 complete. T1 + T2 + T3 done. Starting next session at **T4**.
 
 Node version needed: **20** (`nvm use 20`). Default shell has v10 active.
 
@@ -26,49 +26,18 @@ Node version needed: **20** (`nvm use 20`). Default shell has v10 active.
 ### Checkpoint A (commit `36b24d1`)
 - 34 test files, 485 tests, 0 lint errors. Green.
 
-## Start Here: T3
+### T3 — EndpointBuilder + ODataClient single HTTP layer (commit `2ad3ab4`)
+- Added `serviceDocument()` + `batch()` + port param to `EndpointBuilder`
+- Added `getServiceDocument()` + `getMetadata()` to `ODataClient`
+- Removed all direct `axios` imports from `src/cli/*`: browse, init, health, overview, list, schema
+- Rewrote all affected tests to mock `ODataClient` instead of axios
+- 36 test files, 506 tests, 0 lint errors
 
-**Task:** Adopt `EndpointBuilder` as single URL source. Commands migrate off inline `axios`.
+## Start Here: T4
 
-**Acceptance:**
-- No command imports `axios` directly (except `client.ts`)
-- `EndpointBuilder` has methods for every URL the CLI constructs
-- `ODataClient` exposes `getServiceDocument()` + `getMetadata()` so `list`/`schema` drop their inline calls
+**Task:** Ensure `Prefer` and `Accept` headers are sent correctly on all relevant requests.
 
-**Files to touch:**
-- `src/api/endpoints.ts` — already has most builder methods; needs `serviceDocument()` + `batch()` added; also needs to accept port in constructor
-- `src/api/client.ts` — add `getServiceDocument()` + `getMetadata()` methods
-- `src/cli/list.ts` — drop direct axios, use `ODataClient.getServiceDocument()` + `getMetadata()`
-- `src/cli/schema.ts` — drop direct axios, use `ODataClient.getMetadata()`
-- `src/cli/health.ts` — drop direct axios, use `ODataClient.getServiceDocument()`
-- `src/cli/overview.ts` — drop direct axios, use `ODataClient.getServiceDocument()` + `getMetadata()`
-- `src/cli/browse.ts` — `fetchDatabases` + `fetchTables` + `executeAction` (view-schema) all use axios directly; migrate to `ODataClient`
-- `tests/unit/api/endpoints.test.ts` — extend with new builder methods
-
-**Key context already read this session:**
-- `endpoints.ts` current state: has `metadata()`, `tables()`, `table()`, `record()`, `createRecord()`, `script()`, `container()` — missing `serviceDocument()` (root `/fmi/odata/v4/`) and `batch()`
-- `EndpointBuilder` constructor takes `(host, database, useHttps)` — no port. Add port param.
-- `browse.ts:fetchDatabases` calls `/fmi/odata/v4` (no database suffix) — that's the service document for the server root, not database-scoped
-- `browse.ts:fetchTables` calls `/fmi/odata/v4/{database}` — database-scoped service document
-- `browse.ts:executeAction` case `view-schema` uses inline axios for metadata
-- `list.ts:listDatabases` calls `/fmi/odata/v4/` (service document)
-- `list.ts:listTables` calls `/{db}/$metadata` XML
-- `health.ts:checkServer` calls `/fmi/odata/v4/` (service document)
-- `overview.ts` calls service document then `/{db}/$metadata` for each db
-
-**Approach for T3:**
-1. Add port to `EndpointBuilder` constructor
-2. Add `serviceDocument()` method (returns `/fmi/odata/v4/` — no database)
-3. Add `batch()` method
-4. Add `getServiceDocument()` + `getMetadata()` to `ODataClient`
-5. Migrate each command, one by one
-6. Verify `grep -rE "axios\." src/cli` returns nothing
-
-**Tricky bit:** `list.ts` + `health.ts` + `overview.ts` build their own axios calls because they don't have access to `ODataClient` — they construct one ad-hoc. Migrate them to instantiate `ODataClient` the same way `get.ts` does.
-
-**browse.ts** is the biggest one — `fetchDatabases`/`fetchTables` use axios directly and build their own auth header. These should delegate to `ODataClient` methods. `executeAction view-schema` also needs to go through the client.
-
-**Test strategy:** Write failing tests for new `ODataClient` methods first, then migrate commands. Existing command tests mock axios — update them to mock `ODataClient` methods instead after migration.
+See `src/api/prefer.ts` (if it exists) or create it. Every `getRecords` / `getRecord` call should send `Prefer: odata.maxpagesize=N` and `Accept: application/json;odata.metadata=minimal`.
 
 ## Checkpoint B (after T3, T4, T5)
 - All commands use `ODataClient` (no direct `axios` in `cli/`)
@@ -96,7 +65,7 @@ Node version needed: **20** (`nvm use 20`). Default shell has v10 active.
 ## Todo State
 ```
 Phase 1: ✅ T1 ✅ T2 ✅ Checkpoint A
-Phase 2: ⬜ T3 ⬜ T4 ⬜ T5 ⬜ Checkpoint B
+Phase 2: ✅ T3 ⬜ T4 ⬜ T5 ⬜ Checkpoint B
 Phase 3: ⬜ T6 ⬜ T7
 Phase 4: ⬜ T8 ⬜ T9 ⬜ T10 ⬜ Checkpoint C
 Phase 5: ⬜ T11 ⬜ T12 ⬜ Checkpoint D
@@ -105,7 +74,7 @@ Phase 5: ⬜ T11 ⬜ T12 ⬜ Checkpoint D
 ## Repo State
 ```
 Branch: feature/odata-conformance-sweep
-Last commit: 36b24d1 chore: tick T1, T2, Checkpoint A in todo
-Tests: 34 files, 485 passing
+Last commit: 2ad3ab4 feat: T3 — adopt ODataClient as single HTTP layer in all CLI commands
+Tests: 36 files, 506 passing
 Lint: 0 errors, 49 warnings (all pre-existing explicit-return-type in test files)
 ```
