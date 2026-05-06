@@ -242,6 +242,28 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Upload command
+  program
+    .command('upload <table> <id> <field> <file>')
+    .description('Upload a file to a container field')
+    .requiredOption('-s, --server <id>', 'Server ID')
+    .requiredOption('-d, --database <name>', 'Database name')
+    .action(async (table: string, id: string, field: string, file: string, options) => {
+      const { UploadCommand } = await import('./cli/upload');
+      const globalOpts = program.opts();
+      const cmd = new UploadCommand({
+        table,
+        id: parseInt(id, 10),
+        field,
+        file,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
   // Schema command
   program
     .command('schema [table]')

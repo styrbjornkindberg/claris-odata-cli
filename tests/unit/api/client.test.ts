@@ -311,6 +311,46 @@ describe('ODataClient', () => {
     });
   });
 
+  describe('uploadContainerField', () => {
+    it('patches the container field URL with file buffer and content type', async () => {
+      const client = createClient();
+      const buffer = Buffer.from('test file content');
+      mockPatch.mockResolvedValue({ data: undefined, status: 204 });
+
+      await client.uploadContainerField('Contacts', 42, 'Photo', buffer, 'image/jpeg');
+
+      expect(mockPatch).toHaveBeenCalledWith(
+        '/fmi/odata/v4/TestDB/Contacts(42)/Photo',
+        buffer,
+        { headers: { 'Content-Type': 'image/jpeg' } }
+      );
+    });
+
+    it('returns void on success', async () => {
+      const client = createClient();
+      const buffer = Buffer.from('data');
+      mockPatch.mockResolvedValue({ data: undefined, status: 204 });
+
+      const result = await client.uploadContainerField('Contacts', 42, 'Photo', buffer, 'image/png');
+
+      expect(result).toBeUndefined();
+    });
+
+    it('uses correct URL with table, record id, and field name', async () => {
+      const client = createClient();
+      const buffer = Buffer.from('pdf content');
+      mockPatch.mockResolvedValue({ data: undefined, status: 204 });
+
+      await client.uploadContainerField('Documents', 99, 'Attachment', buffer, 'application/pdf');
+
+      expect(mockPatch).toHaveBeenCalledWith(
+        '/fmi/odata/v4/TestDB/Documents(99)/Attachment',
+        buffer,
+        expect.objectContaining({ headers: { 'Content-Type': 'application/pdf' } })
+      );
+    });
+  });
+
   describe('error handling', () => {
     it('throws ODataError with status and message from API response', () => {
       createClient();

@@ -273,6 +273,26 @@ export class ODataClient {
   }
 
   /**
+   * Upload a file to a container field
+   *
+   * @param tableName - FileMaker table name
+   * @param recordId - Record ID
+   * @param fieldName - Container field name
+   * @param fileBuffer - File contents as a Buffer
+   * @param contentType - MIME type of the file
+   */
+  async uploadContainerField(
+    tableName: string,
+    recordId: number,
+    fieldName: string,
+    fileBuffer: Buffer,
+    contentType: string
+  ): Promise<void> {
+    const url = `/fmi/odata/v4/${this.database}/${tableName}(${recordId})/${fieldName}`;
+    await this.http.patch(url, fileBuffer, { headers: { 'Content-Type': contentType } });
+  }
+
+  /**
    * Run a FileMaker script
    *
    * @param scriptName - Script name
