@@ -11,9 +11,10 @@ import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
+import { ODataClient } from '../api/client';
+import { AuthenticationError, AuthorizationError, NotFoundError, ODataError } from '../api/errors';
 import { c, tableHeader, tableRow } from '../lib/theme';
 import { OutputFormatter } from '../output/formatter';
-import axios from 'axios';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,18 +51,6 @@ export interface OverviewResult {
   connectedServers: number;
   errorServers: number;
   generatedAt: string;
-}
-
-interface HttpErrorShape {
-  code?: string;
-  message?: string;
-  response?: { status?: number };
-}
-
-interface ODataServiceEntry {
-  name: string;
-  kind?: string;
-  url?: string;
 }
 
 // ─── Command ─────────────────────────────────────────────────────────────────
@@ -150,7 +139,6 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
     };
 
     try {
-      // Check credentials
       const credentials = await this.credentialsManager.listCredentials(server.id);
       if (!credentials || credentials.length === 0) {
         result.status = 'no-credentials';
@@ -171,24 +159,18 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
         return result;
       }
 
-      // Test connectivity and fetch databases
       const protocol = (server.secure ?? true) ? 'https' : 'http';
-      const baseUrl = `${protocol}://${server.host}:${result.port}/fmi/odata/v4`;
-      const authToken = Buffer.from(`${cred.username}:${password}`).toString('base64');
+      const baseUrl = `${protocol}://${server.host}:${result.port}`;
+      const authToken = `Basic ${Buffer.from(`${cred.username}:${password}`).toString('base64')}`;
+
+      const serverClient = new ODataClient({ baseUrl, database: cred.database, authToken });
 
       const start = Date.now();
-      const response = await axios.get(`${baseUrl}/`, {
-        headers: { Authorization: `Basic ${authToken}` },
-        timeout: 10000,
-      });
+      const dbEntries = await serverClient.getServiceDocument();
       result.latency = Date.now() - start;
       result.status = 'connected';
 
-      // Parse databases from service document
-      const data = response.data as { value?: ODataServiceEntry[] };
-      const dbEntries = data.value ?? [];
-
-      // For each database, count tables
+      // For each database, count tables via $metadata
       for (const dbEntry of dbEntries) {
         const dbOverview: DatabaseOverview = {
           name: dbEntry.name,
@@ -197,19 +179,10 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
         };
 
         try {
-          // Fetch metadata to count tables
-          const metadataResponse = await axios.get<string>(
-            `${baseUrl}/${encodeURIComponent(dbEntry.name)}/$metadata`,
-            {
-              headers: {
-                Authorization: `Basic ${authToken}`,
-                Accept: 'application/xml',
-              },
-              timeout: 10000,
-            }
-          );
+          const dbClient = new ODataClient({ baseUrl, database: dbEntry.name, authToken });
+          const xml = await dbClient.getMetadata();
 
-          const tableMatches = [...metadataResponse.data.matchAll(/<EntitySet\s+Name="([^"]+)"/g)];
+          const tableMatches = [...xml.matchAll(/<EntitySet\s+Name="([^"]+)"/g)];
           dbOverview.tableCount = tableMatches.length;
           dbOverview.tables = tableMatches.map((m) => m[1]);
         } catch (err: unknown) {
@@ -233,15 +206,22 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
    * Format error message
    */
   private formatError(error: unknown): string {
-    const parsed = error as HttpErrorShape;
-    if (parsed.code === 'ECONNREFUSED') return 'Connection refused';
-    if (parsed.code === 'ETIMEDOUT' || parsed.code === 'ECONNABORTED') return 'Connection timeout';
-    if (parsed.code === 'ENOTFOUND') return 'Host not found';
-    if (parsed.code === 'CERT_HAS_EXPIRED') return 'Certificate expired';
-    if (parsed.response?.status === 401) return 'Authentication failed';
-    if (parsed.response?.status === 404) return 'Not found';
-    if (parsed.response?.status === 500) return 'Server error';
-    return parsed.message ?? 'Unknown error';
+    if (error instanceof AuthenticationError) return 'Authentication failed';
+    if (error instanceof AuthorizationError) return 'Authorization failed';
+    if (error instanceof NotFoundError) return 'Not found';
+    if (error instanceof ODataError) {
+      if (error.statusCode === 500) return 'Server error';
+      return error.message;
+    }
+    if (error instanceof Error) {
+      const msg = error.message;
+      if (msg.includes('ECONNREFUSED')) return 'Connection refused';
+      if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
+      if (msg.includes('ENOTFOUND')) return 'Host not found';
+      if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
+      return msg;
+    }
+    return 'Unknown error';
   }
 
   /**
@@ -250,7 +230,6 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
   formatOutput(data: OverviewResult): string {
     const lines: string[] = [];
 
-    // Header
     lines.push(c.heading('fmo Overview'));
     lines.push(c.muted(`Generated: ${new Date(data.generatedAt).toLocaleString()}`));
     lines.push('');
@@ -260,7 +239,6 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
       return lines.join('\n');
     }
 
-    // Summary stats
     lines.push(
       `${c.label('Servers:')} ${data.totalServers}  ${c.label('Databases:')} ${c.value(String(data.totalDatabases))}  ${c.label('Tables:')} ${c.value(String(data.totalTables))}`
     );
@@ -269,7 +247,6 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
     );
     lines.push('');
 
-    // Per-server details
     for (const server of data.servers) {
       const icon =
         server.status === 'connected' ? c.ok : server.status === 'no-credentials' ? '⚠' : c.fail;
@@ -294,10 +271,8 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
         `  ${c.muted('Databases:')} ${server.databaseCount}  ${c.muted('Tables:')} ${server.tableCount}`
       );
 
-      // Show database table if detailed
       if (server.databases.length > 0) {
         if (this.options.detailed) {
-          // Detailed: show tables for each database
           for (const db of server.databases) {
             if (db.error) {
               lines.push(
@@ -315,7 +290,6 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
             }
           }
         } else {
-          // Compact: styled table
           const colWidths = [
             { label: 'Database', width: 20 },
             { label: 'Tables', width: 8 },
@@ -341,7 +315,6 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
       lines.push('');
     }
 
-    // Footer
     lines.push(c.separator());
 
     return lines.join('\n');
@@ -391,7 +364,6 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
           process.stdout.write(this.formatJsonl(data) + '\n');
           break;
         case 'csv': {
-          // Flatten servers to CSV rows
           const csvRows = data.servers.flatMap((s) =>
             s.databases.length > 0
               ? s.databases.map((db) => ({

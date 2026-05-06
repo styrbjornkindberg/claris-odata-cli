@@ -12,7 +12,6 @@ import { BrowseCommand } from '../../../src/cli/browse';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
 import { select, input } from '@inquirer/prompts';
-import axios from 'axios';
 import { ODataClient } from '../../../src/api/client';
 
 vi.mock('@inquirer/prompts', () => ({
@@ -206,10 +205,9 @@ describe('BrowseCommand - action menu (CLA-1838)', () => {
       expect(result.error).toContain('Invalid JSON');
     });
 
-    it('view-schema: calls $metadata endpoint and returns schema', async () => {
-      vi.spyOn(axios, 'get').mockResolvedValue({
-        data: '<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"/>',
-      });
+    it('view-schema: calls ODataClient.getMetadata and returns schema', async () => {
+      const xmlSchema = '<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx"/>';
+      vi.spyOn(ODataClient.prototype, 'getMetadata').mockResolvedValue(xmlSchema);
 
       const cmd = new BrowseCommand({});
       const result = await cmd.executeAction(mockServer, mockCredentials, 'Contacts', 'view-schema');
@@ -219,10 +217,7 @@ describe('BrowseCommand - action menu (CLA-1838)', () => {
       const data = result.data as any;
       expect(data.table).toBe('Contacts');
       expect(data.schema).toContain('edmx');
-
-      const callUrl = vi.mocked(axios.get).mock.calls[0][0] as string;
-      expect(callUrl).toContain('$metadata');
-      expect(callUrl).toContain('MyDB');
+      expect(vi.mocked(ODataClient.prototype.getMetadata)).toHaveBeenCalledOnce();
     });
   });
 

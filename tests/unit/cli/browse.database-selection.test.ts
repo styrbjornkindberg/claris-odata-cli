@@ -30,6 +30,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowseCommand } from '../../../src/cli/browse';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
+import { ODataClient } from '../../../src/api/client';
 
 vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),
@@ -49,6 +50,8 @@ vi.mock('../../../src/config/credentials', () => {
     })),
   };
 });
+
+vi.mock('../../../src/api/client');
 
 vi.mock('../../../src/config/servers', () => {
   const mockListServers = vi.fn();
@@ -107,84 +110,65 @@ describe('BrowseCommand - database selection (CLA-1836)', () => {
 
   describe('fetchDatabases()', () => {
     it('extracts database names from OData service document', async () => {
+      vi.spyOn(ODataClient.prototype, 'getServiceDocument').mockResolvedValue([
+        { name: 'Sales', kind: 'EntityContainer' },
+        { name: 'HR', kind: 'EntityContainer' },
+      ]);
+
       const cmd = new BrowseCommand({});
-
-      // Mock axios.get to return a service document
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: {
-          value: [
-            { name: 'Sales', kind: 'EntityContainer', url: 'Sales' },
-            { name: 'HR', kind: 'EntityContainer', url: 'HR' },
-          ],
-        },
-      });
-
       const result = await cmd.fetchDatabases(mockServer, mockCredentials);
 
       expect(result).toEqual(['Sales', 'HR']);
     });
 
     it('returns empty array when service document has no entries', async () => {
+      vi.spyOn(ODataClient.prototype, 'getServiceDocument').mockResolvedValue([]);
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: { value: [] },
-      });
-
       const result = await cmd.fetchDatabases(mockServer, mockCredentials);
 
       expect(result).toEqual([]);
     });
 
     it('throws on network/connection error', async () => {
+      vi.spyOn(ODataClient.prototype, 'getServiceDocument').mockRejectedValue(
+        new Error('ECONNREFUSED')
+      );
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockRejectedValue(new Error('ECONNREFUSED'));
-
       await expect(cmd.fetchDatabases(mockServer, mockCredentials)).rejects.toThrow('ECONNREFUSED');
     });
 
     it('throws on auth error (401)', async () => {
+      vi.spyOn(ODataClient.prototype, 'getServiceDocument').mockRejectedValue(
+        new Error('Request failed with status code 401')
+      );
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockRejectedValue(new Error('Request failed with status code 401'));
-
       await expect(cmd.fetchDatabases(mockServer, mockCredentials)).rejects.toThrow('401');
     });
 
-    it('uses Basic auth header with base64 encoded credentials', async () => {
+    it('constructs ODataClient with Basic auth token from credentials', async () => {
+      vi.spyOn(ODataClient.prototype, 'getServiceDocument').mockResolvedValue([]);
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      const getSpy = vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: { value: [] },
-      });
-
       await cmd.fetchDatabases(mockServer, mockCredentials);
 
-      const callArgs = getSpy.mock.calls[0];
-      const headers = (callArgs[1] as { headers?: Record<string, string> })?.headers ?? {};
-      const expectedToken = Buffer.from(`alice:secret`).toString('base64');
-      expect(headers['Authorization']).toBe(`Basic ${expectedToken}`);
+      const expectedToken = `Basic ${Buffer.from('alice:secret').toString('base64')}`;
+      expect(ODataClient).toHaveBeenCalledWith(
+        expect.objectContaining({ authToken: expectedToken })
+      );
     });
 
-    it('calls the /fmi/odata/v4 endpoint on the server', async () => {
+    it('constructs ODataClient with the server baseUrl', async () => {
+      vi.spyOn(ODataClient.prototype, 'getServiceDocument').mockResolvedValue([]);
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      const getSpy = vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: { value: [] },
-      });
-
       await cmd.fetchDatabases(mockServer, mockCredentials);
 
-      const url = getSpy.mock.calls[0][0];
-      expect(url).toContain('/fmi/odata/v4');
-      expect(url).toContain('fm.example.com');
+      expect(ODataClient).toHaveBeenCalledWith(
+        expect.objectContaining({ baseUrl: 'https://fm.example.com:443' })
+      );
     });
   });
 

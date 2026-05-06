@@ -4,20 +4,16 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import axios from 'axios';
 import { ListCommand } from '../../../src/cli/list';
 import { HealthCommand } from '../../../src/cli/health';
 import { OverviewCommand } from '../../../src/cli/overview';
+import { ODataClient } from '../../../src/api/client';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
 
 vi.mock('../../../src/config/servers');
 vi.mock('../../../src/config/credentials');
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn(),
-  },
-}));
+vi.mock('../../../src/api/client');
 
 const cred = { serverId: 'srv', database: 'DB', username: 'user' };
 
@@ -27,10 +23,17 @@ const DEFAULT = { id: 'srv', name: 'T', host: 'fm.example.com', port: 443, secur
 const SECURE_UNDEFINED = { id: 'srv', name: 'T', host: 'fm.example.com', port: 8443 };
 
 describe('Protocol detection', () => {
-  const mockAxiosGet = vi.mocked(axios.get);
+  let capturedBaseUrl: string;
 
   beforeEach(() => {
-    mockAxiosGet.mockResolvedValue({ data: { value: [] } });
+    capturedBaseUrl = '';
+    vi.mocked(ODataClient).mockImplementation((config) => {
+      capturedBaseUrl = config.baseUrl;
+      return {
+        getServiceDocument: vi.fn().mockResolvedValue([]),
+        getMetadata: vi.fn().mockResolvedValue('<Edmx/>'),
+      } as never;
+    });
     vi.mocked(CredentialsManager).mockImplementation(
       () =>
         ({
@@ -60,45 +63,29 @@ describe('Protocol detection', () => {
     it('uses https when secure=true on port 8443', async () => {
       mockServer(SECURE_NON_443);
       await new ListCommand({ resource: 'databases', serverId: 'srv', output: 'json' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('https://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('https://');
     });
 
     it('uses http when secure=false', async () => {
       mockServer(INSECURE);
       await new ListCommand({ resource: 'databases', serverId: 'srv', output: 'json' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('http://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('http://');
     });
 
     it('defaults to https when secure is undefined', async () => {
       mockServer(SECURE_UNDEFINED);
       await new ListCommand({ resource: 'databases', serverId: 'srv', output: 'json' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('https://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('https://');
     });
 
     it('no regression: port 443 + secure=true still uses https', async () => {
       mockServer(DEFAULT);
       await new ListCommand({ resource: 'databases', serverId: 'srv', output: 'json' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('https://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('https://');
     });
   });
 
   describe('ListCommand – list tables', () => {
-    beforeEach(() => {
-      mockAxiosGet.mockResolvedValue({ data: '<Edmx/>' } as never);
-    });
-
     it('uses https when secure=true on port 8443', async () => {
       mockServer(SECURE_NON_443);
       await new ListCommand({
@@ -107,10 +94,7 @@ describe('Protocol detection', () => {
         database: 'DB',
         output: 'json',
       }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('https://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('https://');
     });
 
     it('uses http when secure=false', async () => {
@@ -121,10 +105,7 @@ describe('Protocol detection', () => {
         database: 'DB',
         output: 'json',
       }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('http://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('http://');
     });
   });
 
@@ -134,28 +115,19 @@ describe('Protocol detection', () => {
     it('uses https when secure=true on port 8443', async () => {
       mockServer(SECURE_NON_443);
       await new HealthCommand({ output: 'table' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('https://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('https://');
     });
 
     it('uses http when secure=false', async () => {
       mockServer(INSECURE);
       await new HealthCommand({ output: 'table' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('http://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('http://');
     });
 
     it('defaults to https when secure is undefined', async () => {
       mockServer(SECURE_UNDEFINED);
       await new HealthCommand({ output: 'table' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('https://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('https://');
     });
   });
 
@@ -165,28 +137,19 @@ describe('Protocol detection', () => {
     it('uses https when secure=true on port 8443', async () => {
       mockServer(SECURE_NON_443);
       await new OverviewCommand({ output: 'table' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('https://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('https://');
     });
 
     it('uses http when secure=false', async () => {
       mockServer(INSECURE);
       await new OverviewCommand({ output: 'table' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('http://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('http://');
     });
 
     it('defaults to https when secure is undefined', async () => {
       mockServer(SECURE_UNDEFINED);
       await new OverviewCommand({ output: 'table' }).execute();
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('https://'),
-        expect.anything(),
-      );
+      expect(capturedBaseUrl).toContain('https://');
     });
   });
 });

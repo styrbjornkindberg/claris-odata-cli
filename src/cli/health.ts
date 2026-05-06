@@ -6,9 +6,10 @@
  * @module cli/health
  */
 
-import axios from 'axios';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
+import { ODataClient } from '../api/client';
+import { AuthenticationError, AuthorizationError, NotFoundError, ODataError } from '../api/errors';
 import { logger } from '../utils/logger';
 import { c } from '../lib/theme';
 import { OutputFormatter } from '../output/formatter';
@@ -35,14 +36,6 @@ export interface HealthResult {
   unhealthy: number;
   total: number;
   generatedAt: string;
-}
-
-interface HttpErrorShape {
-  code?: string;
-  message?: string;
-  response?: {
-    status?: number;
-  };
 }
 
 /**
@@ -102,7 +95,6 @@ export class HealthCommand {
     };
 
     try {
-      // Get credentials for this server
       const credentials = await this.credentialsManager.listCredentials(server.id);
 
       if (!credentials || credentials.length === 0) {
@@ -111,7 +103,6 @@ export class HealthCommand {
         return health;
       }
 
-      // Use first credential to test connectivity
       const cred = credentials[0];
       const storedPassword = await this.credentialsManager.getCredentials(
         server.id,
@@ -125,17 +116,14 @@ export class HealthCommand {
         return health;
       }
 
-      // Test connectivity with a simple HTTP request
       const protocol = (server.secure ?? true) ? 'https' : 'http';
-      const baseUrl = `${protocol}://${server.host}:${health.port}/fmi/odata/v4`;
-      const authToken = Buffer.from(`${cred.username}:${storedPassword}`).toString('base64');
+      const baseUrl = `${protocol}://${server.host}:${health.port}`;
+      const authToken = `Basic ${Buffer.from(`${cred.username}:${storedPassword}`).toString('base64')}`;
 
-      // Test connectivity by hitting the root endpoint
+      const client = new ODataClient({ baseUrl, database: cred.database, authToken });
+
       const start = Date.now();
-      await axios.get(`${baseUrl}/`, {
-        headers: { Authorization: `Basic ${authToken}` },
-        timeout: 5000,
-      });
+      await client.getServiceDocument();
       health.latency = Date.now() - start;
     } catch (error: unknown) {
       health.status = 'error';
@@ -149,30 +137,22 @@ export class HealthCommand {
    * Format error message for display
    */
   private formatError(error: unknown): string {
-    const parsed = error as HttpErrorShape;
-
-    if (parsed.code === 'ECONNREFUSED') {
-      return 'Connection refused';
+    if (error instanceof AuthenticationError) return 'Authentication failed';
+    if (error instanceof AuthorizationError) return 'Authorization failed';
+    if (error instanceof NotFoundError) return 'Database not found';
+    if (error instanceof ODataError) {
+      if (error.statusCode === 500) return 'Server error';
+      return error.message;
     }
-    if (parsed.code === 'ETIMEDOUT' || parsed.code === 'ECONNABORTED') {
-      return 'Connection timeout';
+    if (error instanceof Error) {
+      const msg = error.message;
+      if (msg.includes('ECONNREFUSED')) return 'Connection refused';
+      if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
+      if (msg.includes('ENOTFOUND')) return 'Host not found';
+      if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
+      return msg;
     }
-    if (parsed.code === 'ENOTFOUND') {
-      return 'Host not found';
-    }
-    if (parsed.code === 'CERT_HAS_EXPIRED') {
-      return 'Certificate expired';
-    }
-    if (parsed.response?.status === 401) {
-      return 'Authentication failed';
-    }
-    if (parsed.response?.status === 404) {
-      return 'Database not found';
-    }
-    if (parsed.response?.status === 500) {
-      return 'Server error';
-    }
-    return parsed.message ?? 'Unknown error';
+    return 'Unknown error';
   }
 
   /**
@@ -181,7 +161,6 @@ export class HealthCommand {
   formatOutput(result: HealthResult): string {
     const lines: string[] = [];
 
-    // Header
     lines.push(c.heading('Health Check'));
     lines.push(c.muted(`Generated: ${new Date(result.generatedAt).toLocaleString()}`));
     lines.push('');
@@ -191,7 +170,6 @@ export class HealthCommand {
       return lines.join('\n');
     }
 
-    // Server status
     for (const server of result.servers) {
       const statusIcon =
         server.status === 'ok' ? c.ok : server.status === 'no-credentials' ? c.warn : c.fail;
@@ -212,7 +190,6 @@ export class HealthCommand {
       lines.push('');
     }
 
-    // Summary
     lines.push(c.separator());
     lines.push(
       `${c.label('Total:')} ${result.total}  ${c.label('Healthy:')} ${c.success(String(result.healthy))}  ${c.label('Unhealthy:')} ${result.unhealthy > 0 ? c.error(String(result.unhealthy)) : c.success('0')}`
@@ -225,7 +202,6 @@ export class HealthCommand {
    * Format as JSONL (one server per line)
    */
   formatJsonl(result: HealthResult): string {
-    // Convert ServerHealth objects to plain records for JSONL
     const servers = result.servers.map((s) => ({
       id: s.id,
       name: s.name,
@@ -253,8 +229,7 @@ export class HealthCommand {
         case 'jsonl':
           process.stdout.write(this.formatJsonl(result) + '\n');
           break;
-        case 'csv':
-          // Convert ServerHealth objects to plain records for CSV
+        case 'csv': {
           const csvServers = result.servers.map((s) => ({
             id: s.id,
             name: s.name,
@@ -266,13 +241,13 @@ export class HealthCommand {
           }));
           process.stdout.write(this.formatter.formatCsv(csvServers) + '\n');
           break;
+        }
         case 'table':
         default:
           process.stdout.write(this.formatOutput(result) + '\n');
           break;
       }
 
-      // Exit with error code if any servers are unhealthy
       return result.unhealthy > 0 ? 1 : 0;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);

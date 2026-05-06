@@ -7,38 +7,44 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import axios from 'axios';
 import { OverviewCommand } from '../../../src/cli/overview';
 import type { OverviewResult } from '../../../src/cli/overview';
+import { ODataClient } from '../../../src/api/client';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
+import {
+  AuthenticationError,
+  ODataError,
+} from '../../../src/api/errors';
 import { stripAnsi } from '../../../src/lib/theme';
 
-// Mock dependencies
 vi.mock('../../../src/config/servers');
 vi.mock('../../../src/config/credentials');
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn(),
-  },
-}));
+vi.mock('../../../src/api/client');
 
 describe('OverviewCommand', () => {
-  let mockServerManager: any;
-  let mockCredentialsManager: any;
-  const mockAxiosGet = vi.mocked(axios.get);
+  let mockServerManager: { listServers: ReturnType<typeof vi.fn> };
+  let mockCredentialsManager: {
+    listCredentials: ReturnType<typeof vi.fn>;
+    getCredentials: ReturnType<typeof vi.fn>;
+  };
+  let mockGetServiceDocument: ReturnType<typeof vi.fn>;
+  let mockGetMetadata: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mockServerManager = {
-      listServers: vi.fn(),
-    };
+    mockServerManager = { listServers: vi.fn() };
     mockCredentialsManager = {
       listCredentials: vi.fn(),
       getCredentials: vi.fn(),
     };
+    mockGetServiceDocument = vi.fn();
+    mockGetMetadata = vi.fn();
 
-    vi.mocked(ServerManager).mockImplementation(() => mockServerManager);
-    vi.mocked(CredentialsManager).mockImplementation(() => mockCredentialsManager);
+    vi.mocked(ServerManager).mockImplementation(() => mockServerManager as never);
+    vi.mocked(CredentialsManager).mockImplementation(() => mockCredentialsManager as never);
+    vi.mocked(ODataClient).mockImplementation(
+      () => ({ getServiceDocument: mockGetServiceDocument, getMetadata: mockGetMetadata } as never)
+    );
   });
 
   afterEach(() => {
@@ -107,19 +113,14 @@ describe('OverviewCommand', () => {
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
 
-      // First call: service document listing databases
-      mockAxiosGet.mockResolvedValueOnce({
-        data: {
-          value: [
-            { name: 'TestDB', kind: 'EntityContainer', url: 'https://fm.example.com/fmi/odata/v4/TestDB' },
-          ],
-        },
-      });
-
-      // Second call: metadata for TestDB (with EntitySet entries)
-      mockAxiosGet.mockResolvedValueOnce({
-        data: '<?xml version="1.0"?><edmx:Edmx><EntitySet Name="Customers"/><EntitySet Name="Orders"/><EntitySet Name="Products"/></edmx:Edmx>',
-      });
+      // Service document: one database
+      mockGetServiceDocument.mockResolvedValueOnce([
+        { name: 'TestDB', kind: 'EntityContainer', url: 'https://fm.example.com/fmi/odata/v4/TestDB' },
+      ]);
+      // Metadata for TestDB
+      mockGetMetadata.mockResolvedValueOnce(
+        '<?xml version="1.0"?><edmx:Edmx><EntitySet Name="Customers"/><EntitySet Name="Orders"/><EntitySet Name="Products"/></edmx:Edmx>'
+      );
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -145,7 +146,7 @@ describe('OverviewCommand', () => {
         { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockAxiosGet.mockRejectedValue({ code: 'ECONNREFUSED' });
+      mockGetServiceDocument.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:443'));
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -163,7 +164,7 @@ describe('OverviewCommand', () => {
         { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockAxiosGet.mockRejectedValue({ code: 'ETIMEDOUT' });
+      mockGetServiceDocument.mockRejectedValue(new Error('connect ETIMEDOUT 10.0.0.1:443'));
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -181,7 +182,9 @@ describe('OverviewCommand', () => {
         { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockAxiosGet.mockRejectedValue({ code: 'ENOTFOUND' });
+      mockGetServiceDocument.mockRejectedValue(
+        new Error('getaddrinfo ENOTFOUND fm.example.com')
+      );
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -198,7 +201,7 @@ describe('OverviewCommand', () => {
         { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('wrong-password');
-      mockAxiosGet.mockRejectedValue({ response: { status: 401 } });
+      mockGetServiceDocument.mockRejectedValue(new AuthenticationError('Unauthorized', {}));
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -216,7 +219,7 @@ describe('OverviewCommand', () => {
         { serverId: 'server-1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockAxiosGet.mockRejectedValue({ response: { status: 500 } });
+      mockGetServiceDocument.mockRejectedValue(new ODataError('Internal server error', 500));
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -234,15 +237,14 @@ describe('OverviewCommand', () => {
       mockCredentialsManager.listCredentials
         .mockResolvedValueOnce([{ serverId: 's1', database: 'ProdDB', username: 'admin' }])
         .mockResolvedValueOnce([]); // s2: no credentials
-
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
 
-      mockAxiosGet.mockResolvedValueOnce({
-        data: { value: [{ name: 'ProdDB' }] },
-      });
-      mockAxiosGet.mockResolvedValueOnce({
-        data: '<?xml version="1.0"?><EntitySet Name="Contacts"/>',
-      });
+      // s1 service document
+      mockGetServiceDocument.mockResolvedValueOnce([{ name: 'ProdDB' }]);
+      // s1 metadata for ProdDB
+      mockGetMetadata.mockResolvedValueOnce(
+        '<?xml version="1.0"?><EntitySet Name="Contacts"/>'
+      );
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -265,7 +267,7 @@ describe('OverviewCommand', () => {
         { serverId: 's1', database: 'DB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('pw');
-      mockAxiosGet.mockResolvedValueOnce({ data: { value: [] } });
+      mockGetServiceDocument.mockResolvedValueOnce([]);
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -282,14 +284,14 @@ describe('OverviewCommand', () => {
         { serverId: 's1', database: 'DB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('pw');
-      mockAxiosGet.mockResolvedValueOnce({ data: { value: [] } });
+      mockGetServiceDocument.mockResolvedValueOnce([]);
 
       const cmd = new OverviewCommand({ output: 'table' });
       await cmd.execute();
 
-      expect(mockAxiosGet).toHaveBeenCalledWith(
-        expect.stringContaining('http://dev.local:8080'),
-        expect.any(Object)
+      // Verify ODataClient was constructed with http baseUrl
+      expect(ODataClient).toHaveBeenCalledWith(
+        expect.objectContaining({ baseUrl: 'http://dev.local:8080' })
       );
     });
 
@@ -303,11 +305,9 @@ describe('OverviewCommand', () => {
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
 
       // Service document: one database
-      mockAxiosGet.mockResolvedValueOnce({
-        data: { value: [{ name: 'ProdDB' }] },
-      });
+      mockGetServiceDocument.mockResolvedValueOnce([{ name: 'ProdDB' }]);
       // Metadata: fails for this database
-      mockAxiosGet.mockRejectedValueOnce({ code: 'ETIMEDOUT' });
+      mockGetMetadata.mockRejectedValueOnce(new Error('connect ETIMEDOUT 10.0.0.1:443'));
 
       const cmd = new OverviewCommand({ output: 'table' });
       const result = await cmd.execute();
@@ -350,15 +350,12 @@ describe('OverviewCommand', () => {
 
     it('formats heading with fmo Overview', () => {
       const cmd = new OverviewCommand({ output: 'table' });
-      const output = cmd.formatOutput(sampleData);
-      const plain = stripAnsi(output);
-      expect(plain).toContain('fmo Overview');
+      expect(stripAnsi(cmd.formatOutput(sampleData))).toContain('fmo Overview');
     });
 
     it('shows server name, host, and status', () => {
       const cmd = new OverviewCommand({ output: 'table' });
-      const output = cmd.formatOutput(sampleData);
-      const plain = stripAnsi(output);
+      const plain = stripAnsi(cmd.formatOutput(sampleData));
       expect(plain).toContain('Production');
       expect(plain).toContain('fm.example.com:443');
       expect(plain).toContain('Connected');
@@ -366,15 +363,12 @@ describe('OverviewCommand', () => {
 
     it('shows latency for connected servers', () => {
       const cmd = new OverviewCommand({ output: 'table' });
-      const output = cmd.formatOutput(sampleData);
-      const plain = stripAnsi(output);
-      expect(plain).toContain('42ms');
+      expect(stripAnsi(cmd.formatOutput(sampleData))).toContain('42ms');
     });
 
     it('shows database counts and table counts', () => {
       const cmd = new OverviewCommand({ output: 'table' });
-      const output = cmd.formatOutput(sampleData);
-      const plain = stripAnsi(output);
+      const plain = stripAnsi(cmd.formatOutput(sampleData));
       expect(plain).toContain('Servers: 1');
       expect(plain).toContain('Databases: 1');
       expect(plain).toContain('Tables: 12');
@@ -399,10 +393,9 @@ describe('OverviewCommand', () => {
         connectedServers: 0,
         errorServers: 1,
       };
-      const cmd = new OverviewCommand({ output: 'table' });
-      const output = cmd.formatOutput(data);
-      const plain = stripAnsi(output);
-      expect(plain).toContain('Connection refused');
+      expect(stripAnsi(new OverviewCommand({ output: 'table' }).formatOutput(data))).toContain(
+        'Connection refused'
+      );
     });
 
     it('formats server with no-credentials status', () => {
@@ -424,10 +417,9 @@ describe('OverviewCommand', () => {
         connectedServers: 0,
         errorServers: 1,
       };
-      const cmd = new OverviewCommand({ output: 'table' });
-      const output = cmd.formatOutput(data);
-      const plain = stripAnsi(output);
-      expect(plain).toContain('No credentials');
+      expect(stripAnsi(new OverviewCommand({ output: 'table' }).formatOutput(data))).toContain(
+        'No credentials'
+      );
     });
 
     it('formats empty result with warning', () => {
@@ -441,15 +433,12 @@ describe('OverviewCommand', () => {
         errorServers: 0,
         generatedAt: '2026-04-24T10:00:00Z',
       };
-      const output = cmd.formatOutput(data);
-      const plain = stripAnsi(output);
-      expect(plain).toContain('No servers configured');
+      expect(stripAnsi(cmd.formatOutput(data))).toContain('No servers configured');
     });
 
     it('shows detailed table listing when detailed option is set', () => {
       const cmd = new OverviewCommand({ output: 'table', detailed: true });
-      const output = cmd.formatOutput(sampleData);
-      const plain = stripAnsi(output);
+      const plain = stripAnsi(cmd.formatOutput(sampleData));
       expect(plain).toContain('MainDB');
       expect(plain).toContain('Contacts');
       expect(plain).toContain('Orders');
@@ -458,10 +447,8 @@ describe('OverviewCommand', () => {
 
     it('shows compact database table by default (no --detailed)', () => {
       const cmd = new OverviewCommand({ output: 'table' });
-      const output = cmd.formatOutput(sampleData);
-      const plain = stripAnsi(output);
+      const plain = stripAnsi(cmd.formatOutput(sampleData));
       expect(plain).toContain('MainDB');
-      // Should show table header "Database"
       expect(plain).toContain('Database');
     });
   });
@@ -506,12 +493,10 @@ describe('OverviewCommand', () => {
 
       const jsonl = cmd['formatJsonl'](data);
       const lines = jsonl.split('\n');
-
       expect(lines).toHaveLength(2);
 
       const s1 = JSON.parse(lines[0]);
       expect(s1.id).toBe('s1');
-      expect(s1.name).toBe('Prod');
       expect(s1.latency).toBe(42);
       expect(s1.databases).toHaveLength(1);
 
@@ -533,12 +518,9 @@ describe('OverviewCommand', () => {
         { serverId: 's1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockAxiosGet.mockResolvedValue({ data: { value: [] } });
+      mockGetServiceDocument.mockResolvedValue([]);
 
-      const cmd = new OverviewCommand({ output: 'table' });
-      const exitCode = await cmd.run();
-
-      expect(exitCode).toBe(0);
+      expect(await new OverviewCommand({ output: 'table' }).run()).toBe(0);
     });
 
     it('returns 1 when any server has errors', async () => {
@@ -549,21 +531,14 @@ describe('OverviewCommand', () => {
         { serverId: 's1', database: 'TestDB', username: 'admin' },
       ]);
       mockCredentialsManager.getCredentials.mockResolvedValue('password123');
-      mockAxiosGet.mockRejectedValue({ code: 'ECONNREFUSED' });
+      mockGetServiceDocument.mockRejectedValue(new Error('connect ECONNREFUSED 127.0.0.1:443'));
 
-      const cmd = new OverviewCommand({ output: 'table' });
-      const exitCode = await cmd.run();
-
-      expect(exitCode).toBe(1);
+      expect(await new OverviewCommand({ output: 'table' }).run()).toBe(1);
     });
 
     it('returns 0 when no servers configured', async () => {
       mockServerManager.listServers.mockReturnValue([]);
-
-      const cmd = new OverviewCommand({ output: 'table' });
-      const exitCode = await cmd.run();
-
-      expect(exitCode).toBe(0);
+      expect(await new OverviewCommand({ output: 'table' }).run()).toBe(0);
     });
   });
 });

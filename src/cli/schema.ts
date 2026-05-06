@@ -7,7 +7,7 @@
  */
 
 import { BaseCommand, type CommandOptions } from './index';
-import axios from 'axios';
+import { ODataClient } from '../api/client';
 import { AuthManager } from '../api/auth';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
@@ -79,18 +79,9 @@ export class SchemaCommand extends BaseCommand<SchemaOptions> {
       const authManager = new AuthManager();
       const authToken = authManager.createBasicAuthToken(entry.username, password);
 
-      const metadataUrl = `${baseUrl}/fmi/odata/v4/${encodeURIComponent(this.options.database)}/$metadata`;
-      const response = await axios.get<string>(metadataUrl, {
-        headers: {
-          Authorization: authToken,
-          Accept: 'application/xml',
-          'OData-Version': '4.0',
-          'OData-MaxVersion': '4.0',
-        },
-        timeout: 30000,
-      });
+      const client = new ODataClient({ baseUrl, database: this.options.database, authToken });
+      const xml = await client.getMetadata();
 
-      const xml = response.data;
       const tableMatches = [...xml.matchAll(/<EntitySet\s+Name="([^"]+)"/g)];
       const tables = tableMatches.map((m) => m[1]);
 
