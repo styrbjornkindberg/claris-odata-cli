@@ -3,9 +3,9 @@
 Companion to [`plan.md`](plan.md). Single-page checklist for tracking progress.
 
 ## Phase 1: Bug fixes
-- [ ] **T1** Fix protocol detection across `list` / `health` / `overview` (S)
-- [ ] **T2** Throw typed error subclasses from `client.handleApiError` (S)
-- [ ] **Checkpoint A** — tests + lint green, no regressions
+- [x] **T1** Fix protocol detection across `list` / `health` / `overview` (S)
+- [x] **T2** Throw typed error subclasses from `client.handleApiError` (S)
+- [x] **Checkpoint A** — tests + lint green, no regressions
 
 ## Phase 2: Foundations
 - [ ] **T3** Adopt `EndpointBuilder` as single URL source; commands move off inline `axios` (L)
