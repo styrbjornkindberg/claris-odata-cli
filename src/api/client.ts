@@ -17,6 +17,7 @@ import {
   RateLimitError,
   ValidationError,
 } from './errors';
+import { buildPreferHeader, type PreferOptions } from './prefer';
 import type { QueryOptions } from '../types';
 
 /**
@@ -31,7 +32,12 @@ export interface ClientConfig {
   authToken: string;
   /** Request timeout in milliseconds */
   timeout?: number;
+  /** Default Prefer header options applied to every read request. Callers may override per-call. */
+  defaultPrefer?: PreferOptions;
 }
+
+/** Accept header sent on all record-read requests */
+const ACCEPT_RECORDS = 'application/json;odata.metadata=minimal;IEEE754Compatible=true';
 
 /**
  * Default request timeout (30 seconds)
@@ -46,9 +52,11 @@ const DEFAULT_TIMEOUT_MS = 30000;
 export class ODataClient {
   private readonly http: AxiosInstance;
   private readonly database: string;
+  private readonly defaultPrefer: PreferOptions;
 
   constructor(config: ClientConfig) {
     this.database = config.database;
+    this.defaultPrefer = { includeSpecialColumns: true, ...config.defaultPrefer };
 
     this.http = axios.create({
       baseURL: config.baseUrl,
@@ -182,11 +190,18 @@ export class ODataClient {
    * @param options - Query options
    * @returns Array of records
    */
-  async getRecords<T = unknown>(tableName: string, options?: QueryOptions): Promise<T[]> {
+  async getRecords<T = unknown>(
+    tableName: string,
+    options?: QueryOptions,
+    prefer?: PreferOptions
+  ): Promise<T[]> {
     const query = this.buildQueryString(options);
     const url = `/fmi/odata/v4/${this.database}/${tableName}${query}`;
+    const preferHeaders = buildPreferHeader({ ...this.defaultPrefer, ...prefer });
 
-    const response = await this.http.get<{ value: T[] }>(url);
+    const response = await this.http.get<{ value: T[] }>(url, {
+      headers: { Accept: ACCEPT_RECORDS, ...preferHeaders },
+    });
     return response.data.value;
   }
 
@@ -197,9 +212,17 @@ export class ODataClient {
    * @param recordId - Record ID
    * @returns Single record
    */
-  async getRecord<T = unknown>(tableName: string, recordId: number): Promise<T> {
+  async getRecord<T = unknown>(
+    tableName: string,
+    recordId: number,
+    prefer?: PreferOptions
+  ): Promise<T> {
     const url = `/fmi/odata/v4/${this.database}/${tableName}(${recordId})`;
-    const response = await this.http.get<T>(url);
+    const preferHeaders = buildPreferHeader({ ...this.defaultPrefer, ...prefer });
+
+    const response = await this.http.get<T>(url, {
+      headers: { Accept: ACCEPT_RECORDS, ...preferHeaders },
+    });
     return response.data;
   }
 

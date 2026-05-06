@@ -86,7 +86,7 @@ describe('ODataClient', () => {
 
       const result = await client.getRecords('Customers');
 
-      expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers');
+      expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers', expect.anything());
       expect(result).toEqual([{ id: 1 }]);
     });
 
@@ -175,7 +175,7 @@ describe('ODataClient', () => {
 
       await client.getRecords('Customers');
 
-      expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers');
+      expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers', expect.anything());
     });
   });
 
@@ -186,7 +186,7 @@ describe('ODataClient', () => {
 
       const result = await client.getRecord('Customers', 42);
 
-      expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers(42)');
+      expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers(42)', expect.anything());
       expect(result).toEqual({ id: 42, name: 'Test' });
     });
   });
