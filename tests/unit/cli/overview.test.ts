@@ -274,9 +274,9 @@ describe('OverviewCommand', () => {
       expect(data.servers[0].port).toBe(443);
     });
 
-    it('uses http protocol for non-443 ports', async () => {
+    it('uses http protocol when secure=false', async () => {
       mockServerManager.listServers.mockReturnValue([
-        { id: 's1', name: 'Dev', host: 'dev.local', port: 8080 },
+        { id: 's1', name: 'Dev', host: 'dev.local', port: 8080, secure: false },
       ]);
       mockCredentialsManager.listCredentials.mockResolvedValue([
         { serverId: 's1', database: 'DB', username: 'admin' },
@@ -287,7 +287,6 @@ describe('OverviewCommand', () => {
       const cmd = new OverviewCommand({ output: 'table' });
       await cmd.execute();
 
-      // Verify the URL used http protocol
       expect(mockAxiosGet).toHaveBeenCalledWith(
         expect.stringContaining('http://dev.local:8080'),
         expect.any(Object)

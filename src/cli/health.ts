@@ -91,6 +91,7 @@ export class HealthCommand {
     name: string;
     host: string;
     port?: number;
+    secure?: boolean;
   }): Promise<ServerHealth> {
     const health: ServerHealth = {
       id: server.id,
@@ -125,7 +126,7 @@ export class HealthCommand {
       }
 
       // Test connectivity with a simple HTTP request
-      const protocol = health.port === 443 ? 'https' : 'http';
+      const protocol = (server.secure ?? true) ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${health.port}/fmi/odata/v4`;
       const authToken = Buffer.from(`${cred.username}:${storedPassword}`).toString('base64');
 

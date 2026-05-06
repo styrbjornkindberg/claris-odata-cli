@@ -172,7 +172,7 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
       }
 
       // Test connectivity and fetch databases
-      const protocol = result.port === 443 ? 'https' : 'http';
+      const protocol = (server.secure ?? true) ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${result.port}/fmi/odata/v4`;
       const authToken = Buffer.from(`${cred.username}:${password}`).toString('base64');
 
@@ -209,9 +209,7 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
             }
           );
 
-          const tableMatches = [
-            ...metadataResponse.data.matchAll(/<EntitySet\s+Name="([^"]+)"/g),
-          ];
+          const tableMatches = [...metadataResponse.data.matchAll(/<EntitySet\s+Name="([^"]+)"/g)];
           dbOverview.tableCount = tableMatches.length;
           dbOverview.tables = tableMatches.map((m) => m[1]);
         } catch (err: unknown) {
@@ -302,7 +300,9 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
           // Detailed: show tables for each database
           for (const db of server.databases) {
             if (db.error) {
-              lines.push(`    ${c.muted('•')} ${c.resource.database(db.name)} — ${c.error(db.error)}`);
+              lines.push(
+                `    ${c.muted('•')} ${c.resource.database(db.name)} — ${c.error(db.error)}`
+              );
             } else {
               lines.push(
                 `    ${c.muted('•')} ${c.resource.database(db.name)} (${db.tableCount} tables)`

@@ -151,7 +151,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
       }
 
       // Get databases from server
-      const protocol = server.port === 443 ? 'https' : 'http';
+      const protocol = (server.secure ?? true) ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}/fmi/odata/v4`;
       const authToken = Buffer.from(`${cred.username}:${password}`).toString('base64');
 
@@ -269,7 +269,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
         };
       }
 
-      const protocol = server.port === 443 ? 'https' : 'http';
+      const protocol = (server.secure ?? true) ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}/fmi/odata/v4`;
       const authToken = Buffer.from(`${entry.username}:${password}`).toString('base64');
 
