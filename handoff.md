@@ -1,80 +1,151 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-**Date:** 2026-05-06 (session 3)
+**Last updated:** 2026-05-06 (session 4)
 **Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
 
-## Where We Are
+## Node Version
 
-Phase 1 + T3 complete. T1 + T2 + T3 done. Starting next session at **T4**.
+Node 20 is already active (`node --version` → v20.19.2). `nvm use 20` fails due to a
+binary download issue in this environment — ignore it, the right version is already in use.
 
-Node version needed: **20** (`nvm use 20`). Default shell has v10 active.
+## What's Done
 
-## What Landed This Session
+| Task | Commit | Summary |
+|------|--------|---------|
+| T1 | `b97074f` | Protocol fix: `secure ?? true` instead of `port === 443` in list/health/overview |
+| T2 | `0822db3` | `handleApiError` throws typed subclasses (401→Auth, 403→Authz, 404→NotFound, 400→Validation, 429→RateLimit) |
+| Checkpoint A | `36b24d1` | 34 files, 485 tests, 0 lint errors |
+| T3 | `2ad3ab4` | ODataClient single HTTP layer — no direct axios in `src/cli/*`; added `getServiceDocument()` + `getMetadata()` |
+| T4 | `de8b6ed` | `src/api/prefer.ts` created; `getRecords`/`getRecord` send `Accept: application/json;odata.metadata=minimal;IEEE754Compatible=true` and `Prefer: fmodata.include-specialcolumns` by default |
 
-### T1 — Protocol detection fix (commit `b97074f`)
-- `list.ts`, `health.ts`, `overview.ts` all used `port === 443 ? 'https' : 'http'`
-- Fixed to `(server.secure ?? true) ? 'https' : 'http'` in all three
-- Added `secure?: boolean` to `checkServer` param type in `health.ts`
-- 12 new tests: `tests/unit/cli/protocol-detection.test.ts`
-- Fixed pre-existing overview.test.ts that encoded the buggy behavior
+**Current state:** 38 test files, 529 tests passing, 0 lint errors, build clean.
 
-### T2 — Typed error subclasses (commit `0822db3`)
-- `handleApiError` now switches on status: 401→`AuthenticationError`, 403→`AuthorizationError`, 404→`NotFoundError`, 400→`ValidationError`, 429→`RateLimitError` (parses `Retry-After` header), else→`ODataError`
-- 8 new tests: `tests/unit/api/client-errors.test.ts`
+---
 
-### Checkpoint A (commit `36b24d1`)
-- 34 test files, 485 tests, 0 lint errors. Green.
+## Start Here: T5
 
-### T3 — EndpointBuilder + ODataClient single HTTP layer (commit `2ad3ab4`)
-- Added `serviceDocument()` + `batch()` + port param to `EndpointBuilder`
-- Added `getServiceDocument()` + `getMetadata()` to `ODataClient`
-- Removed all direct `axios` imports from `src/cli/*`: browse, init, health, overview, list, schema
-- Rewrote all affected tests to mock `ODataClient` instead of axios
-- 36 test files, 506 tests, 0 lint errors
+**Goal:** `fmo get --count` returns a count; `getRecords` return type is `QueryResult<T>`.
 
-## Start Here: T4
+### What to build
 
-**Task:** Ensure `Prefer` and `Accept` headers are sent correctly on all relevant requests.
+1. Add `QueryResult<T>` and `ODataCollection<T>` to `src/types/index.ts`:
+   ```ts
+   export interface QueryResult<T> {
+     records: T[];
+     count?: number;       // populated when options.count === true
+     nextLink?: string;    // @odata.nextLink if present
+   }
 
-See `src/api/prefer.ts` (if it exists) or create it. Every `getRecords` / `getRecord` call should send `Prefer: odata.maxpagesize=N` and `Accept: application/json;odata.metadata=minimal`.
+   export interface ODataCollection<T> {
+     value: T[];
+     '@odata.count'?: number;
+     '@odata.nextLink'?: string;
+   }
+   ```
 
-## Checkpoint B (after T3, T4, T5)
-- All commands use `ODataClient` (no direct `axios` in `cli/`)
-- Prefer + Accept headers verified
-- `fmo get --count` works
-- Human review before Phase 3
+2. Change `ODataClient.getRecords` signature and return type:
+   ```ts
+   async getRecords<T = unknown>(
+     tableName: string,
+     options?: QueryOptions,
+     prefer?: PreferOptions,
+   ): Promise<QueryResult<T>>
+   ```
+   Response mapping:
+   ```ts
+   return {
+     records: response.data.value,
+     count: response.data['@odata.count'],
+     nextLink: response.data['@odata.nextLink'],
+   };
+   ```
 
-## Decisions Already Locked In
-(unchanged from session 1 — see SPEC.md for full list)
+3. Update all callers of `getRecords`:
+   - `src/cli/get.ts` — use `result.records` instead of bare array; pass `count` through to output
+   - `src/cli/browse.ts` — use `result.records`
+
+4. Wire `--expand` flag in `src/cli/get.ts` (it's already in `QueryOptions` but missing from the commander option and the `GetOptions` interface mapping).
+
+5. Update tests:
+   - `tests/unit/api/client.test.ts` — `getRecords` mocks need to return `{ value: [...] }` (already do) and assertions on return value now expect `{ records: [...] }` shape
+   - `tests/unit/cli/get.test.ts` — update mock setup and assertions
+   - Add new test: `getRecords({ count: true })` → `result.count` equals `@odata.count` from response
+
+### Acceptance criteria (from SPEC.md)
+- `getRecords({ count: true })` returns `{ records, count }` with `count` matching `@odata.count`
+- `--expand` flag on `fmo get` populates `$expand` in the URL
+- All existing tests still pass after the breaking return-type change
+
+---
+
+## Checkpoint B (T3 + T4 + T5)
+
+- [ ] All commands use `ODataClient` (no direct `axios` in `cli/`) ✅ T3
+- [ ] `Prefer` + `Accept` headers verified ✅ T4
+- [ ] `fmo get --count` works ⬜ T5
+- [ ] Human review before Phase 3
+
+---
+
+## Remaining Work (Phase 3+)
+
+### Phase 3
+- **T6** — `fmo script <name>` command: POST to `.../Script(<name>)`, support `--table`, `--id`, `--params <json>`
+- **T7** — `fmo upload <table> <id> <field> <file>` command: PATCH container field with file bytes
+
+### Phase 4
+- **T8** — `fmo batch --file <batch.json>`: POST `multipart/mixed` to `/$batch` (JSON DSL → multipart)
+- **T9** — `fmo update --replace`: PUT instead of PATCH
+- **T10** — Cleanup sweep:
+  - `formatError` centralised in `BaseCommand` (remove duplicates in list/health/overview)
+  - Eliminate any remaining `error as HttpErrorShape` casts
+  - `browse.ts`: change entity filter to `e.kind !== 'FunctionImport'`
+  - Ensure `Authorization` header always goes through `AuthManager` (no inline `Buffer.from`)
+- **Checkpoint C** — review
+
+### Phase 5
+- **T11** — Coverage: ≥ 80% overall, 100% on `api/client.ts` + `api/prefer.ts`
+- **T12** — Smoke-test notes: manual verification checklist against real FileMaker Cloud instance (`list`, `get --count`, `script`, `upload`)
+- **Checkpoint D** — final review, merge
+
+---
+
+## Decisions Locked In
 
 - `EndpointBuilder` = single URL source
-- `Prefer` first-class via `src/api/prefer.ts`
-- `getRecords` → `QueryResult<T>` (breaking, major bump)
-- `handleApiError` → typed subclasses ✅ done
+- `Prefer` first-class via `src/api/prefer.ts` ✅
+- `getRecords` → `QueryResult<T>` (breaking, major bump) — implement in T5
+- `handleApiError` → typed subclasses ✅
 - Batch input = JSON DSL → multipart
-- Container download out of scope
+- `IEEE754Compatible=true` always-on ✅
+- Container download (`fmo download`) = out of scope this sweep
 
 ## Hard Rules
+
 - Never `any` or `as` to silence types
 - Never disable a failing test
 - Never `git push --force` or `--no-verify`
 - Never log passwords or full auth headers
 - Don't change keychain account-key format
+- Run `npm test && npm run lint` before every commit
 
 ## Todo State
+
 ```
-Phase 1: ✅ T1 ✅ T2 ✅ Checkpoint A
-Phase 2: ✅ T3 ⬜ T4 ⬜ T5 ⬜ Checkpoint B
-Phase 3: ⬜ T6 ⬜ T7
-Phase 4: ⬜ T8 ⬜ T9 ⬜ T10 ⬜ Checkpoint C
-Phase 5: ⬜ T11 ⬜ T12 ⬜ Checkpoint D
+Phase 1: ✅ T1  ✅ T2  ✅ Checkpoint A
+Phase 2: ✅ T3  ✅ T4  ⬜ T5  ⬜ Checkpoint B
+Phase 3: ⬜ T6  ⬜ T7
+Phase 4: ⬜ T8  ⬜ T9  ⬜ T10  ⬜ Checkpoint C
+Phase 5: ⬜ T11  ⬜ T12  ⬜ Checkpoint D
 ```
 
 ## Repo State
+
 ```
-Branch: feature/odata-conformance-sweep
-Last commit: 2ad3ab4 feat: T3 — adopt ODataClient as single HTTP layer in all CLI commands
-Tests: 36 files, 506 passing
-Lint: 0 errors, 49 warnings (all pre-existing explicit-return-type in test files)
+Branch:      feature/odata-conformance-sweep
+Last commit: de8b6ed feat: T4 — add prefer.ts and send correct Prefer/Accept headers on reads
+Tests:       38 files, 529 passing
+Lint:        0 errors, 49 warnings (all pre-existing explicit-return-type in test files)
+Build:       clean
 ```
