@@ -23,18 +23,21 @@ binary download issue in this environment — ignore it, the right version is al
 | T6 | `80e73c9` | `fmo script <name>` command — ODataClient.runScript(), ScriptCommand, commander wiring |
 | T7 | `e5ca7e5` | `fmo upload <table> <id> <field> <file>` — PATCH container field with file bytes; MIME detection |
 | T8 | `edd1a2c` | `fmo batch --file <batch.json>` — JSON DSL → multipart/mixed POST to `/$batch` |
+| T9 | `a9a24da` | `fmo update --replace` — PUT via `ODataClient.replaceRecord`; `UpdateOptions.replace` flag |
 
-**Current state:** 41 test files, 568 tests passing, 0 lint errors, build clean.
+**Current state:** 41 test files, 571 tests passing, 0 lint errors, build clean.
 
 ---
 
-## Start Here: T9
+## Start Here: T10
 
-**Goal:** Add `fmo update --replace`: PUT instead of PATCH.
+**Goal:** Cleanup sweep (see Phase 4 below).
 
-- `ODataClient.replaceRecord<T>(tableName, recordId, data)` — PUT to `/fmi/odata/v4/{db}/{table}({id})`
-- `UpdateCommand`: add `--replace` flag; when set, call `replaceRecord` instead of `updateRecord`
-- Commander: add `.option('--replace', 'Replace record (PUT) instead of partial update (PATCH)')` to existing `update` command
+---
+
+## T9 (done)
+
+**Goal:** Add `fmo update --replace`: PUT instead of PATCH. ✅
 
 ---
 
@@ -173,7 +176,7 @@ Parse `--params` with `JSON.parse`; surface a clear error if the JSON is invalid
 Phase 1: ✅ T1  ✅ T2  ✅ Checkpoint A
 Phase 2: ✅ T3  ✅ T4  ✅ T5  ✅ Checkpoint B
 Phase 3: ✅ T6  ✅ T7
-Phase 4: ✅ T8  ⬜ T9  ⬜ T10  ⬜ Checkpoint C
+Phase 4: ✅ T8  ✅ T9  ⬜ T10  ⬜ Checkpoint C
 Phase 5: ⬜ T11  ⬜ T12  ⬜ Checkpoint D
 ```
 
