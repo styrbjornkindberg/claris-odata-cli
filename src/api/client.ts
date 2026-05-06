@@ -9,7 +9,14 @@
 
 import type { AxiosInstance } from 'axios';
 import axios from 'axios';
-import { ODataError } from './errors';
+import {
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ODataError,
+  RateLimitError,
+  ValidationError,
+} from './errors';
 import type { QueryOptions } from '../types';
 
 /**
@@ -112,10 +119,31 @@ export class ODataClient {
    */
   private handleApiError(error: unknown): never {
     if (axios.isAxiosError(error) && error.response) {
-      const odataError = error.response.data?.error as { message?: string } | undefined;
+      const { status, data, headers } = error.response;
+      const odataError = data?.error as { message?: string } | undefined;
       const message = odataError?.message ?? error.message;
 
-      throw new ODataError(message, error.response.status, error.response.data);
+      switch (status) {
+        case 400:
+          throw new ValidationError(message, data);
+        case 401:
+          throw new AuthenticationError(message, data);
+        case 403:
+          throw new AuthorizationError(message, data);
+        case 404:
+          throw new NotFoundError(message, data);
+        case 429: {
+          const retryAfterRaw = headers?.['retry-after'] as string | undefined;
+          const retryAfter = retryAfterRaw !== undefined ? parseInt(retryAfterRaw, 10) : undefined;
+          throw new RateLimitError(
+            message,
+            Number.isNaN(retryAfter) ? undefined : retryAfter,
+            data
+          );
+        }
+        default:
+          throw new ODataError(message, status, data);
+      }
     }
 
     throw new ODataError(error instanceof Error ? error.message : 'Unknown error', 500);
