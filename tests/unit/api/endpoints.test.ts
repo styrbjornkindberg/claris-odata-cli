@@ -9,23 +9,23 @@ describe('EndpointBuilder', () => {
   describe('existing methods remain correct', () => {
     it('metadata() returns database-scoped $metadata URL', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB');
-      expect(b.metadata()).toBe('https://fm.example.com:443/fmi/odata/v4/MyDB/$metadata');
+      expect(b.metadata()).toBe('https://fm.example.com/fmi/odata/v4/MyDB/$metadata');
     });
 
     it('tables() returns database-scoped base URL', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB');
-      expect(b.tables()).toBe('https://fm.example.com:443/fmi/odata/v4/MyDB');
+      expect(b.tables()).toBe('https://fm.example.com/fmi/odata/v4/MyDB');
     });
 
     it('table() appends table name', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB');
-      expect(b.table('Contacts')).toBe('https://fm.example.com:443/fmi/odata/v4/MyDB/Contacts');
+      expect(b.table('Contacts')).toBe('https://fm.example.com/fmi/odata/v4/MyDB/Contacts');
     });
 
     it('record() appends record ID', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB');
       expect(b.record('Contacts', 42)).toBe(
-        'https://fm.example.com:443/fmi/odata/v4/MyDB/Contacts(42)'
+        'https://fm.example.com/fmi/odata/v4/MyDB/Contacts(42)'
       );
     });
   });
@@ -33,7 +33,7 @@ describe('EndpointBuilder', () => {
   describe('port in constructor', () => {
     it('defaults to port 443 with HTTPS', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB');
-      expect(b.tables()).toContain(':443/');
+      expect(b.tables()).not.toContain(':443/');
     });
 
     it('uses custom port when supplied', () => {
@@ -43,7 +43,7 @@ describe('EndpointBuilder', () => {
 
     it('uses port 80 as default for HTTP', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB', false);
-      expect(b.tables()).toContain(':80/');
+      expect(b.tables()).not.toContain(':80/');
     });
 
     it('uses custom HTTP port when supplied', () => {
@@ -62,7 +62,7 @@ describe('EndpointBuilder', () => {
   describe('serviceDocument()', () => {
     it('returns root service document URL with no database path', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB');
-      expect(b.serviceDocument()).toBe('https://fm.example.com:443/fmi/odata/v4/');
+      expect(b.serviceDocument()).toBe('https://fm.example.com/fmi/odata/v4/');
     });
 
     it('includes custom port', () => {
@@ -72,7 +72,7 @@ describe('EndpointBuilder', () => {
 
     it('uses http when useHttps=false', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB', false, 80);
-      expect(b.serviceDocument()).toBe('http://fm.example.com:80/fmi/odata/v4/');
+      expect(b.serviceDocument()).toBe('http://fm.example.com/fmi/odata/v4/');
     });
 
     it('does not include database name in service document URL', () => {
@@ -84,7 +84,7 @@ describe('EndpointBuilder', () => {
   describe('batch()', () => {
     it('returns $batch URL', () => {
       const b = new EndpointBuilder('fm.example.com', 'MyDB');
-      expect(b.batch()).toBe('https://fm.example.com:443/fmi/odata/v4/$batch');
+      expect(b.batch()).toBe('https://fm.example.com/fmi/odata/v4/$batch');
     });
 
     it('includes custom port', () => {

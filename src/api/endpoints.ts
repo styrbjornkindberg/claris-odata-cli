@@ -26,7 +26,9 @@ export class EndpointBuilder {
   constructor(host: string, database: string, useHttps: boolean = true, port?: number) {
     const protocol = useHttps ? 'https' : 'http';
     const resolvedPort = port ?? (useHttps ? 443 : 80);
-    this.baseUrl = `${protocol}://${host}:${resolvedPort}`;
+    const defaultPort = useHttps ? 443 : 80;
+    const portStr = resolvedPort === defaultPort ? '' : `:${resolvedPort}`;
+    this.baseUrl = `${protocol}://${host}${portStr}`;
     this.database = database;
   }
 
