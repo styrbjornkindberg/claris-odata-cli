@@ -1,6 +1,6 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-**Last updated:** 2026-05-06 (session 6)
+**Last updated:** 2026-05-06 (session 8)
 **Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
 
@@ -20,12 +20,35 @@ binary download issue in this environment — ignore it, the right version is al
 | T4 | `de8b6ed` | `src/api/prefer.ts` created; `getRecords`/`getRecord` send `Accept: application/json;odata.metadata=minimal;IEEE754Compatible=true` and `Prefer: fmodata.include-specialcolumns` by default |
 | T5 | `a5b908d` | `QueryResult<T>` + `ODataCollection<T>` types; `getRecords` returns `{ records, count, nextLink }`; `--expand` flag wired in CLI |
 | Checkpoint B review | `ba53833` | Fixed health.ts ECONNREFUSED dead-code path, get.ts baseUrl suffix, --count null leak |
+| T6 | `80e73c9` | `fmo script <name>` command — ODataClient.runScript(), ScriptCommand, commander wiring |
+| T7 | `e5ca7e5` | `fmo upload <table> <id> <field> <file>` — PATCH container field with file bytes; MIME detection |
+| T8 | `edd1a2c` | `fmo batch --file <batch.json>` — JSON DSL → multipart/mixed POST to `/$batch` |
 
-**Current state:** 38 test files, 530 tests passing, 0 lint errors, build clean.
+**Current state:** 41 test files, 568 tests passing, 0 lint errors, build clean.
 
 ---
 
-## Start Here: T6
+## Start Here: T9
+
+**Goal:** Add `fmo update --replace`: PUT instead of PATCH.
+
+- `ODataClient.replaceRecord<T>(tableName, recordId, data)` — PUT to `/fmi/odata/v4/{db}/{table}({id})`
+- `UpdateCommand`: add `--replace` flag; when set, call `replaceRecord` instead of `updateRecord`
+- Commander: add `.option('--replace', 'Replace record (PUT) instead of partial update (PATCH)')` to existing `update` command
+
+---
+
+## T8 (done)
+
+**Goal:** Add `fmo upload <table> <id> <field> <file>` command — PATCH container field with file bytes.
+
+- `ODataClient.uploadContainerField(table, recordId, field, buffer, contentType)` — PATCH `/fmi/odata/v4/{db}/{table}({id})/{field}`
+- `UploadCommand` reads file from disk, detects MIME from extension (jpeg/png/gif/pdf/xml/txt/csv → octet-stream fallback)
+- Commander wiring: `upload <table> <id> <field> <file>` with `-s` and `-d` required options
+
+---
+
+## T6 (done)
 
 **Goal:** Add `fmo script <name>` command — POST to FileMaker script endpoint.
 
@@ -149,8 +172,8 @@ Parse `--params` with `JSON.parse`; surface a clear error if the JSON is invalid
 ```
 Phase 1: ✅ T1  ✅ T2  ✅ Checkpoint A
 Phase 2: ✅ T3  ✅ T4  ✅ T5  ✅ Checkpoint B
-Phase 3: ⬜ T6  ⬜ T7
-Phase 4: ⬜ T8  ⬜ T9  ⬜ T10  ⬜ Checkpoint C
+Phase 3: ✅ T6  ✅ T7
+Phase 4: ✅ T8  ⬜ T9  ⬜ T10  ⬜ Checkpoint C
 Phase 5: ⬜ T11  ⬜ T12  ⬜ Checkpoint D
 ```
 
@@ -158,8 +181,8 @@ Phase 5: ⬜ T11  ⬜ T12  ⬜ Checkpoint D
 
 ```
 Branch:      feature/odata-conformance-sweep
-Last commit: ba53833 fix: review items 1-2+4 — health.ts ECONNREFUSED path, get.ts baseUrl, count omission
-Tests:       38 files, 530 passing
+Last commit: edd1a2c feat: T8 — fmo batch --file <batch.json> command
+Tests:       41 files, 568 passing
 Lint:        0 errors, 49 warnings (all pre-existing explicit-return-type in test files)
 Build:       clean
 ```
