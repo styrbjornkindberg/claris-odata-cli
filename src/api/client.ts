@@ -150,6 +150,32 @@ export class ODataClient {
   }
 
   /**
+   * Get the server-level service document (lists available databases)
+   *
+   * @returns Array of service document entries
+   */
+  async getServiceDocument(): Promise<Array<{ name: string; kind?: string; url?: string }>> {
+    const response = await this.http.get<{
+      value?: Array<{ name: string; kind?: string; url?: string }>;
+    }>('/fmi/odata/v4/', {
+      headers: { Accept: 'application/json' },
+    });
+    return response.data.value ?? [];
+  }
+
+  /**
+   * Get the OData $metadata XML for the current database
+   *
+   * @returns Raw XML metadata string
+   */
+  async getMetadata(): Promise<string> {
+    const response = await this.http.get<string>(`/fmi/odata/v4/${this.database}/$metadata`, {
+      headers: { Accept: 'application/xml' },
+    });
+    return response.data;
+  }
+
+  /**
    * Get records from a table
    *
    * @param tableName - FileMaker table name

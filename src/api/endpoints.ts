@@ -21,20 +21,38 @@ export class EndpointBuilder {
    * @param host - FileMaker server hostname
    * @param database - Database name
    * @param useHttps - Whether to use HTTPS (default: true)
+   * @param port - Port number (default: 443 for HTTPS, 80 for HTTP)
    */
-  constructor(host: string, database: string, useHttps: boolean = true) {
+  constructor(host: string, database: string, useHttps: boolean = true, port?: number) {
     const protocol = useHttps ? 'https' : 'http';
-    this.baseUrl = `${protocol}://${host}`;
+    const resolvedPort = port ?? (useHttps ? 443 : 80);
+    this.baseUrl = `${protocol}://${host}:${resolvedPort}`;
     this.database = database;
   }
 
   /**
-   * Get the base OData URL
-   *
-   * @returns Base OData URL
+   * Get the database-scoped OData base URL
    */
   getBaseUrl(): string {
     return `${this.baseUrl}/fmi/odata/v4/${this.database}`;
+  }
+
+  /**
+   * Build URL for the server-level service document (lists databases)
+   *
+   * @returns Root service document URL — /fmi/odata/v4/
+   */
+  serviceDocument(): string {
+    return `${this.baseUrl}/fmi/odata/v4/`;
+  }
+
+  /**
+   * Build URL for the OData $batch endpoint
+   *
+   * @returns Batch URL
+   */
+  batch(): string {
+    return `${this.baseUrl}/fmi/odata/v4/$batch`;
   }
 
   /**
