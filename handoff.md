@@ -1,6 +1,6 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-**Last updated:** 2026-05-06 (session 4)
+**Last updated:** 2026-05-06 (session 5)
 **Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
 
@@ -18,14 +18,21 @@ binary download issue in this environment — ignore it, the right version is al
 | Checkpoint A | `36b24d1` | 34 files, 485 tests, 0 lint errors |
 | T3 | `2ad3ab4` | ODataClient single HTTP layer — no direct axios in `src/cli/*`; added `getServiceDocument()` + `getMetadata()` |
 | T4 | `de8b6ed` | `src/api/prefer.ts` created; `getRecords`/`getRecord` send `Accept: application/json;odata.metadata=minimal;IEEE754Compatible=true` and `Prefer: fmodata.include-specialcolumns` by default |
+| T5 | `a5b908d` | `QueryResult<T>` + `ODataCollection<T>` types; `getRecords` returns `{ records, count, nextLink }`; `--expand` flag wired in CLI |
 
-**Current state:** 38 test files, 529 tests passing, 0 lint errors, build clean.
+**Current state:** 38 test files, 530 tests passing, 0 lint errors, build clean.
 
 ---
 
-## Start Here: T5
+## ✅ T5 COMPLETE
 
-**Goal:** `fmo get --count` returns a count; `getRecords` return type is `QueryResult<T>`.
+`QueryResult<T>` / `ODataCollection<T>` added, `getRecords` returns `{ records, count, nextLink }`, `--expand` wired. 530 tests, build clean.
+
+---
+
+## Start Here: Checkpoint B review, then T6
+
+Checkpoint B criteria all met (T3+T4+T5 done). Human review before Phase 3. After review, start T6.
 
 ### What to build
 
@@ -83,7 +90,7 @@ binary download issue in this environment — ignore it, the right version is al
 
 - [ ] All commands use `ODataClient` (no direct `axios` in `cli/`) ✅ T3
 - [ ] `Prefer` + `Accept` headers verified ✅ T4
-- [ ] `fmo get --count` works ⬜ T5
+- [ ] `fmo get --count` works ✅ T5
 - [ ] Human review before Phase 3
 
 ---
@@ -134,7 +141,7 @@ binary download issue in this environment — ignore it, the right version is al
 
 ```
 Phase 1: ✅ T1  ✅ T2  ✅ Checkpoint A
-Phase 2: ✅ T3  ✅ T4  ⬜ T5  ⬜ Checkpoint B
+Phase 2: ✅ T3  ✅ T4  ✅ T5  ⬜ Checkpoint B
 Phase 3: ⬜ T6  ⬜ T7
 Phase 4: ⬜ T8  ⬜ T9  ⬜ T10  ⬜ Checkpoint C
 Phase 5: ⬜ T11  ⬜ T12  ⬜ Checkpoint D
