@@ -208,6 +208,21 @@ export type BrowseLevel = 'server' | 'database' | 'table' | 'action';
 export type BrowseAction = 'list-records' | 'get-record' | 'create-record' | 'view-schema';
 
 // ============================================================================
+// Batch Types
+// ============================================================================
+
+/**
+ * A single request in a batch operation
+ */
+export interface BatchRequest {
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  /** URL relative to the database root, e.g. "Contacts?$top=5" */
+  url: string;
+  /** Optional request body for POST/PATCH/PUT */
+  body?: { [key: string]: unknown };
+}
+
+// ============================================================================
 // Logger Types
 // ============================================================================
 

@@ -351,6 +351,103 @@ describe('ODataClient', () => {
     });
   });
 
+  describe('executeBatch', () => {
+    it('posts to the /$batch endpoint', async () => {
+      const client = createClient();
+      vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+      mockPost.mockResolvedValue({ data: '--batch_1234\r\n--batch_1234--\r\n' });
+
+      await client.executeBatch([]);
+
+      expect(mockPost).toHaveBeenCalledWith(
+        '/fmi/odata/v4/TestDB/$batch',
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': expect.stringContaining('multipart/mixed'),
+          }),
+        })
+      );
+    });
+
+    it('sets boundary in Content-Type header', async () => {
+      const client = createClient();
+      vi.spyOn(Date, 'now').mockReturnValue(9999);
+      mockPost.mockResolvedValue({ data: 'response' });
+
+      await client.executeBatch([]);
+
+      const config = mockPost.mock.calls[0][2] as { headers: Record<string, string> };
+      expect(config.headers['Content-Type']).toBe('multipart/mixed; boundary=batch_9999');
+    });
+
+    it('encodes a GET request as a multipart part', async () => {
+      const client = createClient();
+      vi.spyOn(Date, 'now').mockReturnValue(1000);
+      mockPost.mockResolvedValue({ data: 'response' });
+
+      await client.executeBatch([{ method: 'GET', url: 'Contacts?$top=5' }]);
+
+      const body = mockPost.mock.calls[0][1] as string;
+      expect(body).toContain('Content-Type: application/http');
+      expect(body).toContain('GET /fmi/odata/v4/TestDB/Contacts?$top=5 HTTP/1.1');
+    });
+
+    it('encodes a POST request with body as a multipart part', async () => {
+      const client = createClient();
+      vi.spyOn(Date, 'now').mockReturnValue(1000);
+      mockPost.mockResolvedValue({ data: 'response' });
+
+      await client.executeBatch([
+        { method: 'POST', url: 'Contacts', body: { Name: 'Alice' } },
+      ]);
+
+      const body = mockPost.mock.calls[0][1] as string;
+      expect(body).toContain('POST /fmi/odata/v4/TestDB/Contacts HTTP/1.1');
+      expect(body).toContain('Content-Type: application/json');
+      expect(body).toContain('{"Name":"Alice"}');
+    });
+
+    it('encodes a DELETE request as a multipart part', async () => {
+      const client = createClient();
+      vi.spyOn(Date, 'now').mockReturnValue(1000);
+      mockPost.mockResolvedValue({ data: 'response' });
+
+      await client.executeBatch([{ method: 'DELETE', url: 'Contacts(42)' }]);
+
+      const body = mockPost.mock.calls[0][1] as string;
+      expect(body).toContain('DELETE /fmi/odata/v4/TestDB/Contacts(42) HTTP/1.1');
+    });
+
+    it('encodes multiple requests in order', async () => {
+      const client = createClient();
+      vi.spyOn(Date, 'now').mockReturnValue(1000);
+      mockPost.mockResolvedValue({ data: 'response' });
+
+      await client.executeBatch([
+        { method: 'GET', url: 'Contacts' },
+        { method: 'DELETE', url: 'Contacts(1)' },
+      ]);
+
+      const body = mockPost.mock.calls[0][1] as string;
+      const getIdx = body.indexOf('GET /fmi/odata/v4/TestDB/Contacts HTTP/1.1');
+      const delIdx = body.indexOf('DELETE /fmi/odata/v4/TestDB/Contacts(1) HTTP/1.1');
+      expect(getIdx).toBeGreaterThanOrEqual(0);
+      expect(delIdx).toBeGreaterThan(getIdx);
+    });
+
+    it('returns response data', async () => {
+      const client = createClient();
+      vi.spyOn(Date, 'now').mockReturnValue(1000);
+      const responseData = '--batch_1000\r\n--batch_1000--\r\n';
+      mockPost.mockResolvedValue({ data: responseData });
+
+      const result = await client.executeBatch([]);
+
+      expect(result).toBe(responseData);
+    });
+  });
+
   describe('error handling', () => {
     it('throws ODataError with status and message from API response', () => {
       createClient();

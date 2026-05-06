@@ -18,7 +18,7 @@ import {
   ValidationError,
 } from './errors';
 import { buildPreferHeader, type PreferOptions } from './prefer';
-import type { ODataCollection, QueryResult, QueryOptions } from '../types';
+import type { ODataCollection, QueryResult, QueryOptions, BatchRequest } from '../types';
 
 /**
  * Configuration for the OData client
@@ -290,6 +290,44 @@ export class ODataClient {
   ): Promise<void> {
     const url = `/fmi/odata/v4/${this.database}/${tableName}(${recordId})/${fieldName}`;
     await this.http.patch(url, fileBuffer, { headers: { 'Content-Type': contentType } });
+  }
+
+  /**
+   * Execute a batch of OData requests as a single multipart/mixed POST to /$batch
+   *
+   * @param requests - Array of batch requests (method + relative URL + optional body)
+   * @returns Raw multipart response from the server
+   */
+  async executeBatch(requests: BatchRequest[]): Promise<string> {
+    const boundary = `batch_${Date.now()}`;
+    const parts: string[] = [];
+
+    for (const req of requests) {
+      const fullUrl = `/fmi/odata/v4/${this.database}/${req.url}`;
+      let part = `--${boundary}\r\n`;
+      part += `Content-Type: application/http\r\n`;
+      part += `Content-Transfer-Encoding: binary\r\n`;
+      part += `\r\n`;
+      part += `${req.method} ${fullUrl} HTTP/1.1\r\n`;
+      if (req.body !== undefined) {
+        const bodyStr = JSON.stringify(req.body);
+        part += `Content-Type: application/json\r\n`;
+        part += `\r\n`;
+        part += bodyStr;
+        part += `\r\n`;
+      } else {
+        part += `\r\n`;
+      }
+      parts.push(part);
+    }
+
+    const body = parts.join('\r\n') + `--${boundary}--\r\n`;
+    const url = `/fmi/odata/v4/${this.database}/$batch`;
+
+    const response = await this.http.post<string>(url, body, {
+      headers: { 'Content-Type': `multipart/mixed; boundary=${boundary}` },
+    });
+    return response.data;
   }
 
   /**

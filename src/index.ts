@@ -264,6 +264,26 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Batch command
+  program
+    .command('batch')
+    .description('Execute a batch of OData requests from a JSON DSL file')
+    .requiredOption('-s, --server <id>', 'Server ID')
+    .requiredOption('-d, --database <name>', 'Database name')
+    .requiredOption('--file <path>', 'Path to batch JSON file')
+    .action(async (options) => {
+      const { BatchCommand } = await import('./cli/batch');
+      const globalOpts = program.opts();
+      const cmd = new BatchCommand({
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        file: options.file,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
   // Schema command
   program
     .command('schema [table]')
