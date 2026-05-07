@@ -16,6 +16,7 @@ import { join } from 'path';
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import { BaseCommand, type CommandOptions } from './index';
 import { ODataClient } from '../api/client';
+import { AuthManager } from '../api/auth';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { c } from '../lib/theme';
@@ -242,15 +243,16 @@ export class InitCommand extends BaseCommand<InitOptions> {
     const protocol = server.secure !== false ? 'https' : 'http';
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
-    const authToken = `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}`;
+    const authToken = new AuthManager().createBasicAuthToken(
+      credentials.username,
+      credentials.password
+    );
 
     try {
       const client = new ODataClient({ baseUrl, database: '', authToken });
       const entries = await client.getServiceDocument();
       return entries
-        .filter(
-          (e) => e.kind === 'EntityContainer' || e.kind === undefined || e.kind !== 'FunctionImport'
-        )
+        .filter((e) => e.kind !== 'FunctionImport')
         .map((e) => e.name)
         .filter(Boolean);
     } catch {
@@ -274,7 +276,10 @@ export class InitCommand extends BaseCommand<InitOptions> {
     const protocol = server.secure !== false ? 'https' : 'http';
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
-    const authToken = `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}`;
+    const authToken = new AuthManager().createBasicAuthToken(
+      credentials.username,
+      credentials.password
+    );
 
     try {
       const client = new ODataClient({ baseUrl, database, authToken });

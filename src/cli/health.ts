@@ -9,7 +9,9 @@
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { ODataClient } from '../api/client';
-import { AuthenticationError, AuthorizationError, NotFoundError, ODataError } from '../api/errors';
+import { AuthManager } from '../api/auth';
+import { NotFoundError } from '../api/errors';
+import { formatApiError } from './index';
 import { logger } from '../utils/logger';
 import { c } from '../lib/theme';
 import { OutputFormatter } from '../output/formatter';
@@ -118,7 +120,7 @@ export class HealthCommand {
 
       const protocol = (server.secure ?? true) ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${health.port}`;
-      const authToken = `Basic ${Buffer.from(`${cred.username}:${storedPassword}`).toString('base64')}`;
+      const authToken = new AuthManager().createBasicAuthToken(cred.username, storedPassword);
 
       const client = new ODataClient({ baseUrl, database: cred.database, authToken });
 
@@ -127,34 +129,10 @@ export class HealthCommand {
       health.latency = Date.now() - start;
     } catch (error: unknown) {
       health.status = 'error';
-      health.error = this.formatError(error);
+      health.error = error instanceof NotFoundError ? 'Database not found' : formatApiError(error);
     }
 
     return health;
-  }
-
-  /**
-   * Format error message for display
-   */
-  private formatError(error: unknown): string {
-    if (error instanceof AuthenticationError) return 'Authentication failed';
-    if (error instanceof AuthorizationError) return 'Authorization failed';
-    if (error instanceof NotFoundError) return 'Database not found';
-    if (error instanceof ODataError) {
-      if (error.statusCode === 500) {
-        const msg = error.message;
-        if (msg.includes('ECONNREFUSED')) return 'Connection refused';
-        if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
-        if (msg.includes('ENOTFOUND')) return 'Host not found';
-        if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
-        return 'Server error';
-      }
-      return error.message;
-    }
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return 'Unknown error';
   }
 
   /**

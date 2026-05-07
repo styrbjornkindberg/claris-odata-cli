@@ -51,6 +51,39 @@ export interface StructuredError {
 }
 
 /**
+ * Format an error to a human-readable string for display inside compound results
+ * (e.g. per-server health rows, per-database overview rows).
+ *
+ * Exported so commands that do not extend BaseCommand (e.g. HealthCommand) can
+ * use the same logic without duplication.
+ */
+export function formatApiError(error: unknown): string {
+  if (error instanceof AuthenticationError) return 'Authentication failed';
+  if (error instanceof AuthorizationError) return 'Authorization failed';
+  if (error instanceof NotFoundError) return 'Not found';
+  if (error instanceof ODataError) {
+    if (error.statusCode === 500) {
+      const msg = error.message;
+      if (msg.includes('ECONNREFUSED')) return 'Connection refused';
+      if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
+      if (msg.includes('ENOTFOUND')) return 'Host not found';
+      if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
+      return 'Server error';
+    }
+    return error.message;
+  }
+  if (error instanceof Error) {
+    const msg = error.message;
+    if (msg.includes('ECONNREFUSED')) return 'Connection refused';
+    if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
+    if (msg.includes('ENOTFOUND')) return 'Host not found';
+    if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
+    return msg;
+  }
+  return 'Unknown error';
+}
+
+/**
  * Map an error to a stable error code (SPEC-009)
  */
 function resolveErrorCode(error: unknown): ErrorCode {
@@ -184,6 +217,11 @@ export abstract class BaseCommand<TOptions extends CommandOptions = CommandOptio
       }
       return 1;
     }
+  }
+
+  /** Delegates to module-level {@link formatApiError}. */
+  protected formatError(error: unknown): string {
+    return formatApiError(error);
   }
 
   /**

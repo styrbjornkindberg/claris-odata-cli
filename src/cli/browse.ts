@@ -12,6 +12,7 @@ import { BaseCommand, type CommandOptions } from './index';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { ODataClient } from '../api/client';
+import { AuthManager } from '../api/auth';
 import { OutputFormatter } from '../output/formatter';
 import { c } from '../lib/theme';
 import type { CommandResult, CredentialEntry, BrowseAction } from '../types';
@@ -151,14 +152,15 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     const protocol = server.secure !== false ? 'https' : 'http';
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
-    const authToken = `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}`;
+    const authToken = new AuthManager().createBasicAuthToken(
+      credentials.username,
+      credentials.password
+    );
 
     const client = new ODataClient({ baseUrl, database: credentials.database, authToken });
     const entries = await client.getServiceDocument();
     return entries
-      .filter(
-        (e) => e.kind === 'EntityContainer' || e.kind === undefined || e.kind !== 'FunctionImport'
-      )
+      .filter((e) => e.kind !== 'FunctionImport')
       .map((e) => e.name)
       .filter(Boolean);
   }
@@ -207,7 +209,10 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     const protocol = server.secure !== false ? 'https' : 'http';
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
-    const authToken = `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}`;
+    const authToken = new AuthManager().createBasicAuthToken(
+      credentials.username,
+      credentials.password
+    );
 
     const client = new ODataClient({ baseUrl, database, authToken });
     const xml = await client.getMetadata();
@@ -306,7 +311,10 @@ export class BrowseCommand extends BaseCommand<BrowseOptions> {
     const protocol = server.secure !== false ? 'https' : 'http';
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
-    const authToken = `Basic ${Buffer.from(`${credentials.username}:${credentials.password}`).toString('base64')}`;
+    const authToken = new AuthManager().createBasicAuthToken(
+      credentials.username,
+      credentials.password
+    );
 
     const client = new ODataClient({
       baseUrl,

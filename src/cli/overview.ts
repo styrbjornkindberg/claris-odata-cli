@@ -12,7 +12,7 @@ import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { ODataClient } from '../api/client';
-import { AuthenticationError, AuthorizationError, NotFoundError, ODataError } from '../api/errors';
+import { AuthManager } from '../api/auth';
 import { c, tableHeader, tableRow } from '../lib/theme';
 import { OutputFormatter } from '../output/formatter';
 
@@ -161,7 +161,7 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
 
       const protocol = (server.secure ?? true) ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${result.port}`;
-      const authToken = `Basic ${Buffer.from(`${cred.username}:${password}`).toString('base64')}`;
+      const authToken = new AuthManager().createBasicAuthToken(cred.username, password);
 
       const serverClient = new ODataClient({ baseUrl, database: cred.database, authToken });
 
@@ -200,28 +200,6 @@ export class OverviewCommand extends BaseCommand<OverviewOptions> {
     }
 
     return result;
-  }
-
-  /**
-   * Format error message
-   */
-  private formatError(error: unknown): string {
-    if (error instanceof AuthenticationError) return 'Authentication failed';
-    if (error instanceof AuthorizationError) return 'Authorization failed';
-    if (error instanceof NotFoundError) return 'Not found';
-    if (error instanceof ODataError) {
-      if (error.statusCode === 500) return 'Server error';
-      return error.message;
-    }
-    if (error instanceof Error) {
-      const msg = error.message;
-      if (msg.includes('ECONNREFUSED')) return 'Connection refused';
-      if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
-      if (msg.includes('ENOTFOUND')) return 'Host not found';
-      if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
-      return msg;
-    }
-    return 'Unknown error';
   }
 
   /**

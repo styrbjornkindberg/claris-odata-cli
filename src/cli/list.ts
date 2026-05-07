@@ -11,6 +11,7 @@ import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { ODataClient } from '../api/client';
+import { AuthManager } from '../api/auth';
 
 /**
  * List command options
@@ -132,7 +133,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
 
       const protocol = (server.secure ?? true) ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}`;
-      const authToken = `Basic ${Buffer.from(`${cred.username}:${password}`).toString('base64')}`;
+      const authToken = new AuthManager().createBasicAuthToken(cred.username, password);
 
       const client = new ODataClient({ baseUrl, database: cred.database, authToken });
       const entries = await client.getServiceDocument();
@@ -217,7 +218,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
 
       const protocol = (server.secure ?? true) ? 'https' : 'http';
       const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}`;
-      const authToken = `Basic ${Buffer.from(`${entry.username}:${password}`).toString('base64')}`;
+      const authToken = new AuthManager().createBasicAuthToken(entry.username, password);
 
       const client = new ODataClient({ baseUrl, database: this.options.database, authToken });
       const xml = await client.getMetadata();
