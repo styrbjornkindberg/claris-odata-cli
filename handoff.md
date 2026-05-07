@@ -24,14 +24,15 @@ binary download issue in this environment — ignore it, the right version is al
 | T7 | `e5ca7e5` | `fmo upload <table> <id> <field> <file>` — PATCH container field with file bytes; MIME detection |
 | T8 | `edd1a2c` | `fmo batch --file <batch.json>` — JSON DSL → multipart/mixed POST to `/$batch` |
 | T9 | `a9a24da` | `fmo update --replace` — PUT via `ODataClient.replaceRecord`; `UpdateOptions.replace` flag |
+| T10 | `0cabbdb` | Cleanup sweep: `formatApiError` centralised in `src/cli/index.ts`; HealthCommand imports it directly; BaseCommand.formatError delegates; private duplicates removed from health/overview; filter simplified to `e.kind !== 'FunctionImport'`; all `Buffer.from` → `AuthManager.createBasicAuthToken` |
 
-**Current state:** 41 test files, 571 tests passing, 0 lint errors, build clean.
+**Current state:** 42 test files, 582 tests passing, 0 lint errors, build clean.
 
 ---
 
-## Start Here: T10
+## Start Here: T11
 
-**Goal:** Cleanup sweep (see Phase 4 below).
+**Goal:** Coverage — ≥ 80% overall, 100% on `api/client.ts` + `api/prefer.ts` (see Phase 5 below).
 
 ---
 
@@ -176,7 +177,7 @@ Parse `--params` with `JSON.parse`; surface a clear error if the JSON is invalid
 Phase 1: ✅ T1  ✅ T2  ✅ Checkpoint A
 Phase 2: ✅ T3  ✅ T4  ✅ T5  ✅ Checkpoint B
 Phase 3: ✅ T6  ✅ T7
-Phase 4: ✅ T8  ✅ T9  ⬜ T10  ⬜ Checkpoint C
+Phase 4: ✅ T8  ✅ T9  ✅ T10  ⬜ Checkpoint C
 Phase 5: ⬜ T11  ⬜ T12  ⬜ Checkpoint D
 ```
 
@@ -184,8 +185,8 @@ Phase 5: ⬜ T11  ⬜ T12  ⬜ Checkpoint D
 
 ```
 Branch:      feature/odata-conformance-sweep
-Last commit: edd1a2c feat: T8 — fmo batch --file <batch.json> command
-Tests:       41 files, 568 passing
+Last commit: 0cabbdb feat: T10 — cleanup sweep
+Tests:       42 files, 582 passing
 Lint:        0 errors, 49 warnings (all pre-existing explicit-return-type in test files)
 Build:       clean
 ```
