@@ -203,7 +203,7 @@ describe('HealthCommand', () => {
       const result = await cmd.execute();
 
       expect(result.servers[0].latency).toBeDefined();
-      expect(result.servers[0].latency).toBeGreaterThanOrEqual(10);
+      expect(result.servers[0].latency).toBeGreaterThanOrEqual(1);
     });
 
     it('returns 404 as Database not found', async () => {

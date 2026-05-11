@@ -189,6 +189,15 @@ describe('ODataClient', () => {
 
       expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers', expect.anything());
     });
+
+    it('omits query string when empty options object provided', async () => {
+      const client = createClient();
+      mockGet.mockResolvedValue({ data: { value: [] } });
+
+      await client.getRecords('Customers', {});
+
+      expect(mockGet).toHaveBeenCalledWith('/fmi/odata/v4/TestDB/Customers', expect.anything());
+    });
   });
 
   describe('getRecord', () => {

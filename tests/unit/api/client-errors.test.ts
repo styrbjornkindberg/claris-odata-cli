@@ -112,6 +112,15 @@ describe('ODataClient – typed error subclasses', () => {
     }
   });
 
+  it('429 → RateLimitError.retryAfter is undefined when Retry-After is non-numeric', () => {
+    try {
+      interceptorErrorHandler(makeAxiosError(429, { 'retry-after': 'invalid' }));
+    } catch (e) {
+      expect(e).toBeInstanceOf(RateLimitError);
+      expect((e as RateLimitError).retryAfter).toBeUndefined();
+    }
+  });
+
   it('500 → bare ODataError (not a subclass)', () => {
     try {
       interceptorErrorHandler(makeAxiosError(500));
