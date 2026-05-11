@@ -29,14 +29,17 @@ binary download issue in this environment — ignore it, the right version is al
 | T12 | `15b2cc4` | `docs/SMOKE_TEST.md` — manual checklist: health, list databases/tables, get, get --count, get w/ query opts, script (3 URL variants + params + invalid JSON guard), upload (txt + jpeg), error paths, cleanup |
 | Smoke-fix | `41d2e13` | Live smoke test against tethys.squaremoon.se found 2 bugs: Commander option shadowing broke all commands with -s/-d; FileMaker EntityType suffix "_" broke `schema <table>`. Both fixed, 606 tests pass. |
 | T13 | `9748bb4` | Stable server IDs: `buildServerId(name, host)` → SHA-256 8-char suffix; idempotent re-add prints "updated"; 615 tests pass. |
+| Checkpoint C | `19461fc` | Script name URL encoding; upload 25 MB limit; credentials `requiredOption` restored; `formatNetworkError` dedup; 617 tests. |
 
-**Current state:** 43 test files, 615 tests passing, 0 lint errors, build clean.
+**Current state:** 43 test files, 617 tests passing, 0 lint errors, build clean.
 
 ---
 
-## Start Here: Checkpoint C
+## Start Here: Checkpoint D
 
-**Goal:** Code review of the full branch diff (`main..feature/odata-conformance-sweep`) before merge.
+**Goal:** Final review + merge to `main`. See `docs/SMOKE_TEST.md` for pre-merge manual verification.
+
+Checkpoint C ✅ — all review findings resolved (`19461fc`).
 
 ---
 
@@ -306,17 +309,17 @@ Parse `--params` with `JSON.parse`; surface a clear error if the JSON is invalid
 Phase 1: ✅ T1  ✅ T2  ✅ Checkpoint A
 Phase 2: ✅ T3  ✅ T4  ✅ T5  ✅ Checkpoint B
 Phase 3: ✅ T6  ✅ T7
-Phase 4: ✅ T8  ✅ T9  ✅ T10  ⬜ Checkpoint C
+Phase 4: ✅ T8  ✅ T9  ✅ T10
 Phase 5: ✅ T11  ✅ T12  ✅ Smoke-fix
-Phase 6: ✅ T13  ⬜ Checkpoint C  ⬜ Checkpoint D
+Phase 6: ✅ T13  ✅ Checkpoint C  ⬜ Checkpoint D
 ```
 
 ## Repo State
 
 ```
 Branch:      feature/odata-conformance-sweep
-Last commit: 9748bb4 feat(T13): stable deterministic server IDs from name+host hash
-Tests:       43 files, 615 passing
+Last commit: 19461fc fix: Checkpoint C — script URL encoding, upload size limit, credentials validation, formatApiError dedup
+Tests:       43 files, 617 passing
 Coverage:    83.15% stmt/lines, 81.21% branch, 88.37% fn — all ≥ 80%
              api/client.ts 100%, api/prefer.ts 100%, config/profiles.ts 100%
 Lint:        0 errors, 51 warnings (all pre-existing explicit-return-type in test files)
