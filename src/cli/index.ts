@@ -57,28 +57,26 @@ export interface StructuredError {
  * Exported so commands that do not extend BaseCommand (e.g. HealthCommand) can
  * use the same logic without duplication.
  */
+function formatNetworkError(msg: string): string | null {
+  if (msg.includes('ECONNREFUSED')) return 'Connection refused';
+  if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
+  if (msg.includes('ENOTFOUND')) return 'Host not found';
+  if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
+  return null;
+}
+
 export function formatApiError(error: unknown): string {
   if (error instanceof AuthenticationError) return 'Authentication failed';
   if (error instanceof AuthorizationError) return 'Authorization failed';
   if (error instanceof NotFoundError) return 'Not found';
   if (error instanceof ODataError) {
     if (error.statusCode === 500) {
-      const msg = error.message;
-      if (msg.includes('ECONNREFUSED')) return 'Connection refused';
-      if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
-      if (msg.includes('ENOTFOUND')) return 'Host not found';
-      if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
-      return 'Server error';
+      return formatNetworkError(error.message) ?? 'Server error';
     }
     return error.message;
   }
   if (error instanceof Error) {
-    const msg = error.message;
-    if (msg.includes('ECONNREFUSED')) return 'Connection refused';
-    if (msg.includes('ETIMEDOUT') || msg.includes('ECONNABORTED')) return 'Connection timeout';
-    if (msg.includes('ENOTFOUND')) return 'Host not found';
-    if (msg.includes('CERT_HAS_EXPIRED')) return 'Certificate expired';
-    return msg;
+    return formatNetworkError(error.message) ?? error.message;
   }
   return 'Unknown error';
 }

@@ -360,12 +360,13 @@ export class ODataClient {
     options?: { table?: string; recordId?: number; params?: unknown }
   ): Promise<unknown> {
     let url: string;
+    const encodedName = encodeURIComponent(scriptName);
     if (options?.table && options.recordId !== undefined) {
-      url = `/fmi/odata/v4/${this.database}/${options.table}(${options.recordId})/Script('${scriptName}')`;
+      url = `/fmi/odata/v4/${this.database}/${options.table}(${options.recordId})/Script('${encodedName}')`;
     } else if (options?.table) {
-      url = `/fmi/odata/v4/${this.database}/${options.table}/Script('${scriptName}')`;
+      url = `/fmi/odata/v4/${this.database}/${options.table}/Script('${encodedName}')`;
     } else {
-      url = `/fmi/odata/v4/${this.database}/Script('${scriptName}')`;
+      url = `/fmi/odata/v4/${this.database}/Script('${encodedName}')`;
     }
 
     const body = options?.params !== undefined ? { scriptParameterValue: options.params } : {};

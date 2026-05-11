@@ -6,8 +6,10 @@
  * @module cli/upload
  */
 
-import { readFileSync } from 'fs';
+import { readFileSync, statSync } from 'fs';
 import { extname } from 'path';
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 import { BaseCommand, type CommandOptions } from './index';
 import { ODataClient } from '../api/client';
 import { AuthManager } from '../api/auth';
@@ -96,6 +98,14 @@ export class UploadCommand extends BaseCommand<UploadOptions> {
         return {
           success: false,
           error: `Stored credentials are incomplete for server '${this.options.serverId}' and database '${this.options.database}'`,
+        };
+      }
+
+      const stat = statSync(this.options.file);
+      if (stat.size > MAX_UPLOAD_BYTES) {
+        return {
+          success: false,
+          error: `File exceeds 25 MB limit (${stat.size} bytes): ${this.options.file}`,
         };
       }
 

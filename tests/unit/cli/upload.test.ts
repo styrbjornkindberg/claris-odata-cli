@@ -45,6 +45,7 @@ describe('UploadCommand', () => {
     vi.mocked(CredentialsManager).mockImplementation(() => mockCredentialsManager as any);
     vi.mocked(AuthManager).mockImplementation(() => mockAuthManager as any);
     vi.mocked(ODataClient).mockImplementation(() => mockClient as any);
+    vi.mocked(fs.statSync).mockReturnValue({ size: testBuffer.length } as ReturnType<typeof fs.statSync>);
     vi.mocked(fs.readFileSync).mockReturnValue(testBuffer);
 
     mockServerManager.getServer.mockReturnValue({
@@ -216,6 +217,26 @@ describe('UploadCommand', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Stored credentials are incomplete');
+    expect(mockClient.uploadContainerField).not.toHaveBeenCalled();
+  });
+
+  it('rejects files exceeding 25 MB', async () => {
+    vi.mocked(fs.statSync).mockReturnValue({ size: 26 * 1024 * 1024 } as ReturnType<typeof fs.statSync>);
+
+    const cmd = new UploadCommand({
+      serverId: 'prod',
+      database: 'Sales',
+      table: 'Contacts',
+      id: 1,
+      field: 'Photo',
+      file: '/tmp/huge.jpg',
+      output: 'json',
+    });
+
+    const result = await cmd.execute();
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('exceeds 25 MB limit');
     expect(mockClient.uploadContainerField).not.toHaveBeenCalled();
   });
 

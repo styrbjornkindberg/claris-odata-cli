@@ -333,6 +333,18 @@ describe('ODataClient', () => {
 
       expect(result).toEqual(responseData);
     });
+
+    it('URL-encodes script names with spaces and special characters', async () => {
+      const client = createClient();
+      mockPost.mockResolvedValue({ data: {} });
+
+      await client.runScript('My Script Name');
+
+      expect(mockPost).toHaveBeenCalledWith(
+        "/fmi/odata/v4/TestDB/Script('My%20Script%20Name')",
+        {}
+      );
+    });
   });
 
   describe('uploadContainerField', () => {

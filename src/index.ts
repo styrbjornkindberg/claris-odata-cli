@@ -508,8 +508,8 @@ function createProgram(): Command {
     .command('add')
     .description('Store credentials for a server')
     .requiredOption('--server-id <id>', 'Server ID')
-    .option('--database <name>', 'Database name')
-    .option('--username <user>', 'Username')
+    .requiredOption('--database <name>', 'Database name')
+    .requiredOption('--username <user>', 'Username')
     .option('--password <pass>', 'Password (prompted if omitted)')
     .action(async (options) => {
       const { CredentialsCommand } = await import('./cli/credentials');
