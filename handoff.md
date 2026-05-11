@@ -1,6 +1,6 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-**Last updated:** 2026-05-11 (session 9)
+**Last updated:** 2026-05-11 (session 10)
 **Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
 
@@ -26,14 +26,21 @@ binary download issue in this environment — ignore it, the right version is al
 | T9 | `a9a24da` | `fmo update --replace` — PUT via `ODataClient.replaceRecord`; `UpdateOptions.replace` flag |
 | T10 | `0cabbdb` | Cleanup sweep: `formatApiError` centralised in `src/cli/index.ts`; HealthCommand imports it directly; BaseCommand.formatError delegates; private duplicates removed from health/overview; filter simplified to `e.kind !== 'FunctionImport'`; all `Buffer.from` → `AuthManager.createBasicAuthToken` |
 | T11 | `165e35c` | Coverage sweep: `@vitest/coverage-v8` added; `profiles.test.ts` (22 tests, 0→100%); 429 NaN retry-after + empty-options branches in client tests; health latency threshold de-flaked; overall 83.15%, api/client.ts + api/prefer.ts 100% |
+| T12 | `15b2cc4` | `docs/SMOKE_TEST.md` — manual checklist: health, list databases/tables, get, get --count, get w/ query opts, script (3 URL variants + params + invalid JSON guard), upload (txt + jpeg), error paths, cleanup |
 
 **Current state:** 43 test files, 606 tests passing, 0 lint errors, build clean.
 
 ---
 
-## Start Here: T12
+## Start Here: Checkpoint D
 
-**Goal:** Smoke-test notes — manual verification checklist against a real FileMaker Cloud instance (`list`, `get --count`, `script`, `upload`).
+**Goal:** Final review + merge. All tasks complete. See `docs/SMOKE_TEST.md` for pre-merge manual verification.
+
+---
+
+## T12 (done)
+
+**Goal:** Smoke-test notes — manual verification checklist against a real FileMaker Cloud instance (`list`, `get --count`, `script`, `upload`). ✅
 
 ---
 
@@ -185,14 +192,14 @@ Phase 1: ✅ T1  ✅ T2  ✅ Checkpoint A
 Phase 2: ✅ T3  ✅ T4  ✅ T5  ✅ Checkpoint B
 Phase 3: ✅ T6  ✅ T7
 Phase 4: ✅ T8  ✅ T9  ✅ T10  ⬜ Checkpoint C
-Phase 5: ✅ T11  ⬜ T12  ⬜ Checkpoint D
+Phase 5: ✅ T11  ✅ T12  ⬜ Checkpoint D
 ```
 
 ## Repo State
 
 ```
 Branch:      feature/odata-conformance-sweep
-Last commit: 165e35c test: T11 — coverage sweep
+Last commit: 15b2cc4 docs: T12 — smoke-test checklist
 Tests:       43 files, 606 passing
 Coverage:    83.15% stmt/lines, 81.21% branch, 88.37% fn — all ≥ 80%
              api/client.ts 100%, api/prefer.ts 100%, config/profiles.ts 100%
