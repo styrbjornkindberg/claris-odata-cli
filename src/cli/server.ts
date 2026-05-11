@@ -8,7 +8,7 @@
 
 import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult, Server } from '../types';
-import { ServerManager } from '../config/servers';
+import { buildServerId, ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { CredentialsCommand } from './credentials';
 import { OutputFormatter } from '../output/formatter';
@@ -140,16 +140,11 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
   private async addServer(): Promise<CommandResult> {
     const manager = new ServerManager();
 
-    // Check for duplicate name
-    const existing = manager.listServers().find((s) => s.name === this.options.name);
-    if (existing) {
-      return {
-        success: false,
-        error: `Server "${this.options.name}" already exists with ID: ${existing.id}. Use --name with a unique name, or remove the existing server first.`,
-      };
-    }
+    // Check existence before upsert to determine "added" vs "updated" message
+    const id = buildServerId(this.options.name!, this.options.host!);
+    const existing = manager.getServer(id);
 
-    // Add the server
+    // Add or overwrite the server (idempotent — same name+host → same ID)
     const server = manager.addServer({
       name: this.options.name!,
       host: this.options.host!,
@@ -210,6 +205,7 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
       }
     }
 
+    const verb = existing ? 'updated' : 'added successfully';
     return {
       success: true,
       data: {
@@ -218,7 +214,7 @@ export class ServerCommand extends BaseCommand<ServerOptions> {
         host: server.host,
         port: server.port,
         secure: server.secure,
-        message: `Server "${server.name}" added successfully`,
+        message: `Server "${server.name}" ${verb}`,
       },
     };
   }

@@ -17,20 +17,21 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ServerCommand } from '../../../src/cli/server';
 
 // Mock ServerManager to avoid file system access
-vi.mock('../../../src/config/servers', () => {
-  const mockServer = {
-    id: 'test-server-id',
-    name: 'Test Server',
-    host: 'test.local',
-    port: 443,
-    secure: true,
-  };
+const mockServer = {
+  id: 'test-server-id',
+  name: 'Test Server',
+  host: 'test.local',
+  port: 443,
+  secure: true,
+};
 
+vi.mock('../../../src/config/servers', () => {
   return {
+    buildServerId: vi.fn().mockReturnValue('test-server-id'),
     ServerManager: vi.fn().mockImplementation(() => ({
       listServers: vi.fn().mockReturnValue([]),
       addServer: vi.fn().mockReturnValue(mockServer),
-      getServer: vi.fn().mockReturnValue(mockServer),
+      getServer: vi.fn().mockReturnValue(undefined),
       removeServer: vi.fn().mockReturnValue(true),
     })),
     serverStore: {
@@ -162,5 +163,39 @@ describe('ServerCommand - server add incomplete-credential warnings (T010)', () 
 
     expect(result.success).toBe(true);
     expect(loggerWarnSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('ServerCommand - T13 stable server IDs', () => {
+  it('reports "added successfully" when the server does not yet exist', async () => {
+    const { ServerManager } = await import('../../../src/config/servers');
+    vi.mocked(ServerManager).mockImplementationOnce(() => ({
+      listServers: vi.fn().mockReturnValue([]),
+      addServer: vi.fn().mockReturnValue(mockServer),
+      getServer: vi.fn().mockReturnValue(undefined),
+      removeServer: vi.fn().mockReturnValue(true),
+    }));
+
+    const cmd = new ServerCommand({ action: 'add', name: 'dev', host: 'example.com' });
+    const result = await cmd.execute();
+
+    expect(result.success).toBe(true);
+    expect((result.data as Record<string, unknown>).message).toContain('added successfully');
+  });
+
+  it('reports "updated" and succeeds when re-adding a server with the same name+host', async () => {
+    const { ServerManager } = await import('../../../src/config/servers');
+    vi.mocked(ServerManager).mockImplementationOnce(() => ({
+      listServers: vi.fn().mockReturnValue([mockServer]),
+      addServer: vi.fn().mockReturnValue(mockServer),
+      getServer: vi.fn().mockReturnValue(mockServer),
+      removeServer: vi.fn().mockReturnValue(true),
+    }));
+
+    const cmd = new ServerCommand({ action: 'add', name: 'Test Server', host: 'test.local' });
+    const result = await cmd.execute();
+
+    expect(result.success).toBe(true);
+    expect((result.data as Record<string, unknown>).message).toContain('updated');
   });
 });
