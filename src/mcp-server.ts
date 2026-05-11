@@ -20,6 +20,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import { z } from 'zod';
+import { parse as shellParse } from 'shell-quote';
 import pkg from '../package.json';
 
 const execFileAsync = promisify(execFile);
@@ -33,51 +34,16 @@ export type ToolResult = {
 };
 
 /**
- * Split a command string into an argument array using shell-style tokenization.
- * Supports single and double quotes so filter expressions and JSON values with
- * spaces are passed as single arguments, e.g.:
+ * Split a command string into an argument array using POSIX shell tokenization
+ * (via shell-quote). Single and double quotes group tokens containing spaces:
  *   `get Contacts --filter "Status eq 'Active'"` →
  *   ['get', 'Contacts', '--filter', "Status eq 'Active'"]
+ *
+ * Shell operator tokens ({op}) are silently dropped — fmo commands never
+ * contain pipes or redirects.
  */
 export function parseCommandString(command: string): string[] {
-  const args: string[] = [];
-  let current = '';
-  let i = 0;
-
-  while (i < command.length) {
-    const ch = command[i];
-
-    if (ch === '"' || ch === "'") {
-      const quote = ch;
-      i++;
-      while (i < command.length && command[i] !== quote) {
-        // honour backslash escapes inside double quotes only
-        if (ch === '"' && command[i] === '\\' && i + 1 < command.length) {
-          i++;
-          current += command[i];
-        } else {
-          current += command[i];
-        }
-        i++;
-      }
-      i++; // skip closing quote
-    } else if (ch === ' ' || ch === '\t') {
-      if (current.length > 0) {
-        args.push(current);
-        current = '';
-      }
-      i++;
-    } else {
-      current += ch;
-      i++;
-    }
-  }
-
-  if (current.length > 0) {
-    args.push(current);
-  }
-
-  return args;
+  return shellParse(command).filter((t): t is string => typeof t === 'string');
 }
 
 /**
@@ -150,14 +116,19 @@ export function createMcpServer(): {
       description:
         'Execute any fmo CLI command against a FileMaker OData API. ' +
         'Pass arguments as you would after "fmo". ' +
-        'Shell-style quoting is supported — wrap values that contain spaces in ' +
-        'single or double quotes, e.g. ' +
-        '"get Contacts --filter \\"Status eq \'Active\'\\"".',
+        'IMPORTANT: any argument value that contains spaces MUST be wrapped in ' +
+        'single or double quotes — this includes OData filter expressions, ' +
+        'JSON data, and date ranges. ' +
+        'Examples:\n' +
+        '  get TidRad --filter "AnvID eq 126 and Datum ge \'2026-04-01\'" --server s --database db\n' +
+        '  create Contacts --data \'{"Name":"Jane Doe"}\' --server s --database db\n' +
+        'Omitting quotes around a multi-word value will silently truncate it.',
       inputSchema: z.object({
         command: z
           .string()
           .describe(
-            'Arguments to pass to fmo, e.g. "list Contacts --server myserver --json"',
+            'Arguments to pass to fmo. Quote any value containing spaces: ' +
+            'e.g. get TidRad --filter "AnvID eq 126 and Datum ge \'2026-04-01\'" --server s --database db',
           ),
       }),
     },

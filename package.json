@@ -43,6 +43,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/shell-quote": "^1.7.5",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "@vitest/coverage-v8": "^1.6.1",
@@ -60,6 +61,7 @@
     "commander": "^12.0.0",
     "conf": "^12.0.0",
     "keytar": "^7.9.0",
+    "shell-quote": "^1.8.3",
     "zod": "^4.0.0"
   }
 }

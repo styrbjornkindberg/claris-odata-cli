@@ -67,6 +67,18 @@ describe('parseCommandString()', () => {
     ]);
   });
 
+  it('handles OData filter with spaces and nested single quotes', () => {
+    expect(
+      parseCommandString(
+        "get TidRad --filter \"AnvID eq 126 and Datum ge '2026-04-01' and Datum le '2026-04-30'\" -t 3",
+      ),
+    ).toEqual([
+      'get', 'TidRad', '--filter',
+      "AnvID eq 126 and Datum ge '2026-04-01' and Datum le '2026-04-30'",
+      '-t', '3',
+    ]);
+  });
+
   it('collapses extra whitespace between tokens', () => {
     expect(parseCommandString('list   Contacts')).toEqual(['list', 'Contacts']);
   });
