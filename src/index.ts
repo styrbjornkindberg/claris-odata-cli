@@ -508,16 +508,24 @@ function createProgram(): Command {
     .command('add')
     .description('Store credentials for a server')
     .requiredOption('--server-id <id>', 'Server ID')
-    .requiredOption('--database <name>', 'Database name')
+    // Use option (not requiredOption) — Commander v12 greedily consumes --database
+    // at root level when it matches the global -d/--database option. We fall back
+    // to globalOpts.database and validate manually.
+    .option('--database <name>', 'Database name')
     .requiredOption('--username <user>', 'Username')
     .option('--password <pass>', 'Password (prompted if omitted)')
     .action(async (options) => {
       const { CredentialsCommand } = await import('./cli/credentials');
       const globalOpts = program.opts();
+      const database = options.database ?? globalOpts.database;
+      if (!database) {
+        process.stderr.write("error: required option '--database <name>' not specified\n");
+        process.exit(1);
+      }
       const cmd = new CredentialsCommand({
         action: 'add',
         serverId: options.serverId,
-        database: options.database,
+        database,
         username: options.username,
         password: options.password,
         output: globalOpts.format as OutputFormat,
@@ -550,15 +558,21 @@ function createProgram(): Command {
     .command('remove')
     .description('Remove stored credentials for a server')
     .requiredOption('--server-id <id>', 'Server ID')
-    .requiredOption('--database <name>', 'Database name')
+    // Same root-level consumption fix as credentials add — see comment above.
+    .option('--database <name>', 'Database name')
     .requiredOption('--username <user>', 'Username')
     .action(async (options) => {
       const { CredentialsCommand } = await import('./cli/credentials');
       const globalOpts = program.opts();
+      const database = options.database ?? globalOpts.database;
+      if (!database) {
+        process.stderr.write("error: required option '--database <name>' not specified\n");
+        process.exit(1);
+      }
       const cmd = new CredentialsCommand({
         action: 'remove',
         serverId: options.serverId,
-        database: options.database,
+        database,
         username: options.username,
         output: globalOpts.format as OutputFormat,
         verbose: globalOpts.verbose ?? false,
