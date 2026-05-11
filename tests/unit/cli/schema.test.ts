@@ -28,7 +28,7 @@ describe('SchemaCommand', () => {
         <EntitySet Name="Customers" EntityType="FileMaker.Customers" />
         <EntitySet Name="Orders" EntityType="FileMaker.Orders" />
       </EntityContainer>
-      <EntityType Name="Customers">
+      <EntityType Name="Customers_">
         <Key><PropertyRef Name="id" /></Key>
         <Property Name="id" Type="Edm.Int32" Nullable="false" />
         <Property Name="Name" Type="Edm.String" />
@@ -112,6 +112,6 @@ describe('SchemaCommand', () => {
     const result = await cmd.execute();
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Table 'MissingTable' not found in metadata");
+    expect(result.error).toBe("Table 'MissingTable' not found in metadata (looked for EntityType 'MissingTable_')");
   });
 });

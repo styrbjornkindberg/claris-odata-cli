@@ -97,8 +97,10 @@ export class SchemaCommand extends BaseCommand<SchemaOptions> {
       }
 
       const table = this.options.table;
+      // FileMaker OData appends "_" to EntityType names (e.g. "CONTACTS" → "CONTACTS_")
+      const entityTypeName = `${table}_`;
       const entityTypeRegex = new RegExp(
-        `<EntityType\\s+Name=\\"${table.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\"[\\s\\S]*?<\\/EntityType>`,
+        `<EntityType\\s+Name=\\"${entityTypeName.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\"[\\s\\S]*?<\\/EntityType>`,
         'i'
       );
       const section = xml.match(entityTypeRegex)?.[0];
@@ -106,7 +108,7 @@ export class SchemaCommand extends BaseCommand<SchemaOptions> {
       if (!section) {
         return {
           success: false,
-          error: `Table '${table}' not found in metadata`,
+          error: `Table '${table}' not found in metadata (looked for EntityType '${entityTypeName}')`,
         };
       }
 

@@ -97,8 +97,8 @@ function createProgram(): Command {
   program
     .command('get <table>')
     .description('Get records from a table')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .option('--filter <expr>', 'OData filter expression')
     .option('--select <fields>', 'Fields to select (comma-separated)')
     .option('-t, --top <n>', 'Maximum records to return', parseInt)
@@ -132,8 +132,8 @@ function createProgram(): Command {
   program
     .command('create <table>')
     .description('Create a new record')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .requiredOption('--data <json>', 'Record data as JSON')
     .action(async (table: string, options) => {
       const { CreateCommand } = await import('./cli/create');
@@ -161,8 +161,8 @@ function createProgram(): Command {
   program
     .command('update <table> <recordId>')
     .description('Update an existing record')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .requiredOption('--data <json>', 'Record data as JSON')
     .option('--replace', 'Replace record (PUT) instead of partial update (PATCH)')
     .action(async (table: string, recordId: string, options) => {
@@ -193,8 +193,8 @@ function createProgram(): Command {
   program
     .command('delete <table> <recordId>')
     .description('Delete a record')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .action(async (table: string, recordId: string, options) => {
       const { DeleteCommand } = await import('./cli/delete');
       const globalOpts = program.opts();
@@ -213,8 +213,8 @@ function createProgram(): Command {
   program
     .command('script <name>')
     .description('Run a FileMaker script')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .option('--table <name>', 'Table context for the script')
     .option('--id <n>', 'Record ID context', parseInt)
     .option('--params <json>', 'Script parameter as JSON')
@@ -248,8 +248,8 @@ function createProgram(): Command {
   program
     .command('upload <table> <id> <field> <file>')
     .description('Upload a file to a container field')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .action(async (table: string, id: string, field: string, file: string, options) => {
       const { UploadCommand } = await import('./cli/upload');
       const globalOpts = program.opts();
@@ -270,8 +270,8 @@ function createProgram(): Command {
   program
     .command('batch')
     .description('Execute a batch of OData requests from a JSON DSL file')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .requiredOption('--file <path>', 'Path to batch JSON file')
     .action(async (options) => {
       const { BatchCommand } = await import('./cli/batch');
@@ -290,8 +290,8 @@ function createProgram(): Command {
   program
     .command('schema [table]')
     .description('Display table schema')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .action(async (table: string | undefined, options) => {
       const { SchemaCommand } = await import('./cli/schema');
       const globalOpts = program.opts();
@@ -508,8 +508,8 @@ function createProgram(): Command {
     .command('add')
     .description('Store credentials for a server')
     .requiredOption('--server-id <id>', 'Server ID')
-    .requiredOption('--database <name>', 'Database name')
-    .requiredOption('--username <user>', 'Username')
+    .option('--database <name>', 'Database name')
+    .option('--username <user>', 'Username')
     .option('--password <pass>', 'Password (prompted if omitted)')
     .action(async (options) => {
       const { CredentialsCommand } = await import('./cli/credentials');
