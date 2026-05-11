@@ -1,6 +1,6 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-**Last updated:** 2026-05-11 (session 10)
+**Last updated:** 2026-05-11 (session 11)
 **Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
 
@@ -27,6 +27,7 @@ binary download issue in this environment — ignore it, the right version is al
 | T10 | `0cabbdb` | Cleanup sweep: `formatApiError` centralised in `src/cli/index.ts`; HealthCommand imports it directly; BaseCommand.formatError delegates; private duplicates removed from health/overview; filter simplified to `e.kind !== 'FunctionImport'`; all `Buffer.from` → `AuthManager.createBasicAuthToken` |
 | T11 | `165e35c` | Coverage sweep: `@vitest/coverage-v8` added; `profiles.test.ts` (22 tests, 0→100%); 429 NaN retry-after + empty-options branches in client tests; health latency threshold de-flaked; overall 83.15%, api/client.ts + api/prefer.ts 100% |
 | T12 | `15b2cc4` | `docs/SMOKE_TEST.md` — manual checklist: health, list databases/tables, get, get --count, get w/ query opts, script (3 URL variants + params + invalid JSON guard), upload (txt + jpeg), error paths, cleanup |
+| Smoke | `41d2e13` | Live smoke test against tethys.squaremoon.se found 2 bugs: Commander option shadowing broke all commands with -s/-d; FileMaker EntityType suffix "_" broke `schema <table>`. Both fixed, 606 tests pass. |
 
 **Current state:** 43 test files, 606 tests passing, 0 lint errors, build clean.
 
@@ -199,7 +200,7 @@ Phase 5: ✅ T11  ✅ T12  ⬜ Checkpoint D
 
 ```
 Branch:      feature/odata-conformance-sweep
-Last commit: 15b2cc4 docs: T12 — smoke-test checklist
+Last commit: 41d2e13 fix: Commander option shadowing + schema EntityType suffix
 Tests:       43 files, 606 passing
 Coverage:    83.15% stmt/lines, 81.21% branch, 88.37% fn — all ≥ 80%
              api/client.ts 100%, api/prefer.ts 100%, config/profiles.ts 100%
