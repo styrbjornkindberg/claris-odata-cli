@@ -97,18 +97,20 @@ function createProgram(): Command {
   program
     .command('get <table>')
     .description('Get records from a table')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .option('--filter <expr>', 'OData filter expression')
     .option('--select <fields>', 'Fields to select (comma-separated)')
     .option('-t, --top <n>', 'Maximum records to return', parseInt)
     .option('--skip <n>', 'Records to skip', parseInt)
     .option('--orderby <field>', 'Order by field')
     .option('--count', 'Include total count')
+    .option('--expand <entities>', 'Expand related entities (comma-separated)')
     .action(async (table: string, options) => {
       const { GetCommand } = await import('./cli/get');
       const globalOpts = program.opts();
       const select = options.select ? options.select.split(',') : undefined;
+      const expand = options.expand ? options.expand.split(',') : undefined;
       const cmd = new GetCommand({
         table,
         serverId: options.server ?? globalOpts.server,
@@ -119,6 +121,7 @@ function createProgram(): Command {
         skip: options.skip,
         orderby: options.orderby,
         count: options.count,
+        expand,
         output: globalOpts.format as OutputFormat,
         verbose: globalOpts.verbose ?? false,
       });
@@ -129,8 +132,8 @@ function createProgram(): Command {
   program
     .command('create <table>')
     .description('Create a new record')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .requiredOption('--data <json>', 'Record data as JSON')
     .action(async (table: string, options) => {
       const { CreateCommand } = await import('./cli/create');
@@ -158,9 +161,10 @@ function createProgram(): Command {
   program
     .command('update <table> <recordId>')
     .description('Update an existing record')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .requiredOption('--data <json>', 'Record data as JSON')
+    .option('--replace', 'Replace record (PUT) instead of partial update (PATCH)')
     .action(async (table: string, recordId: string, options) => {
       const { UpdateCommand } = await import('./cli/update');
       const globalOpts = program.opts();
@@ -178,6 +182,7 @@ function createProgram(): Command {
         serverId: options.server ?? globalOpts.server,
         database: options.database ?? globalOpts.database,
         data,
+        replace: options.replace === true,
         output: globalOpts.format as OutputFormat,
         verbose: globalOpts.verbose ?? false,
       });
@@ -188,8 +193,8 @@ function createProgram(): Command {
   program
     .command('delete <table> <recordId>')
     .description('Delete a record')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .action(async (table: string, recordId: string, options) => {
       const { DeleteCommand } = await import('./cli/delete');
       const globalOpts = program.opts();
@@ -204,12 +209,89 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Script command
+  program
+    .command('script <name>')
+    .description('Run a FileMaker script')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .option('--table <name>', 'Table context for the script')
+    .option('--id <n>', 'Record ID context', parseInt)
+    .option('--params <json>', 'Script parameter as JSON')
+    .action(async (name: string, options) => {
+      const { ScriptCommand } = await import('./cli/script');
+      const globalOpts = program.opts();
+      let params: unknown;
+      if (options.params) {
+        try {
+          params = JSON.parse(options.params);
+        } catch {
+          logger.error('Invalid JSON for --params');
+          process.exit(1);
+          return;
+        }
+      }
+      const cmd = new ScriptCommand({
+        name,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        table: options.table,
+        id: options.id,
+        params,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Upload command
+  program
+    .command('upload <table> <id> <field> <file>')
+    .description('Upload a file to a container field')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .action(async (table: string, id: string, field: string, file: string, options) => {
+      const { UploadCommand } = await import('./cli/upload');
+      const globalOpts = program.opts();
+      const cmd = new UploadCommand({
+        table,
+        id: parseInt(id, 10),
+        field,
+        file,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Batch command
+  program
+    .command('batch')
+    .description('Execute a batch of OData requests from a JSON DSL file')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .requiredOption('--file <path>', 'Path to batch JSON file')
+    .action(async (options) => {
+      const { BatchCommand } = await import('./cli/batch');
+      const globalOpts = program.opts();
+      const cmd = new BatchCommand({
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        file: options.file,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
   // Schema command
   program
     .command('schema [table]')
     .description('Display table schema')
-    .requiredOption('-s, --server <id>', 'Server ID')
-    .requiredOption('-d, --database <name>', 'Database name')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
     .action(async (table: string | undefined, options) => {
       const { SchemaCommand } = await import('./cli/schema');
       const globalOpts = program.opts();

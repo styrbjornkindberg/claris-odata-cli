@@ -36,6 +36,8 @@ export interface GetOptions extends CommandOptions {
   orderby?: string;
   /** Include total count */
   count?: boolean;
+  /** Expand related entities */
+  expand?: string[];
 }
 
 /**
@@ -98,7 +100,7 @@ export class GetCommand extends BaseCommand<GetOptions> {
       // Build OData client
       const protocol = (server.secure ?? true) ? 'https' : 'http';
       const port = server.port ?? 443;
-      const baseUrl = `${protocol}://${server.host}:${port}/fmi/odata/v4`;
+      const baseUrl = `${protocol}://${server.host}:${port}`;
 
       const authManager = new AuthManager();
       const authToken = authManager.createBasicAuthToken(entry.username, credentials);
@@ -117,14 +119,17 @@ export class GetCommand extends BaseCommand<GetOptions> {
       if (this.options.skip !== undefined) queryOptions.skip = this.options.skip;
       if (this.options.orderby) queryOptions.orderby = this.options.orderby;
       if (this.options.count) queryOptions.count = true;
+      if (this.options.expand) queryOptions.expand = this.options.expand;
 
       // Execute query
-      const records = await client.getRecords(this.options.table, queryOptions);
+      const result = await client.getRecords(this.options.table, queryOptions);
 
-      return {
-        success: true,
-        data: records,
-      };
+      if (this.options.count) {
+        const out: { records: unknown[]; count?: number } = { records: result.records };
+        if (result.count !== undefined) out.count = result.count;
+        return { success: true, data: out };
+      }
+      return { success: true, data: result.records };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return {

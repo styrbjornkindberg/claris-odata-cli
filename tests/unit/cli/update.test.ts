@@ -18,7 +18,7 @@ describe('UpdateCommand', () => {
   const mockServerManager = { getServer: vi.fn() };
   const mockCredentialsManager = { listCredentials: vi.fn(), getCredentials: vi.fn() };
   const mockAuthManager = { createBasicAuthToken: vi.fn() };
-  const mockClient = { updateRecord: vi.fn() };
+  const mockClient = { updateRecord: vi.fn(), replaceRecord: vi.fn() };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -41,6 +41,7 @@ describe('UpdateCommand', () => {
     mockCredentialsManager.getCredentials.mockResolvedValue('secret');
     mockAuthManager.createBasicAuthToken.mockReturnValue('Basic token');
     mockClient.updateRecord.mockResolvedValue({ id: 123, Name: 'Updated Name' });
+    mockClient.replaceRecord.mockResolvedValue({ id: 123, Name: 'Replaced Name' });
   });
 
   it('updates a record successfully', async () => {
@@ -57,6 +58,42 @@ describe('UpdateCommand', () => {
 
     expect(result.success).toBe(true);
     expect(mockClient.updateRecord).toHaveBeenCalledWith('Customers', 123, { Name: 'Updated Name' });
+  });
+
+  it('uses replaceRecord (PUT) when replace option is true', async () => {
+    const cmd = new UpdateCommand({
+      serverId: 'prod',
+      database: 'Sales',
+      table: 'Customers',
+      recordId: 123,
+      data: { Name: 'Replaced Name' },
+      replace: true,
+      output: 'json',
+    });
+
+    const result = await cmd.execute();
+
+    expect(result.success).toBe(true);
+    expect(mockClient.replaceRecord).toHaveBeenCalledWith('Customers', 123, { Name: 'Replaced Name' });
+    expect(mockClient.updateRecord).not.toHaveBeenCalled();
+  });
+
+  it('uses updateRecord (PATCH) by default when replace is false', async () => {
+    const cmd = new UpdateCommand({
+      serverId: 'prod',
+      database: 'Sales',
+      table: 'Customers',
+      recordId: 123,
+      data: { Name: 'Updated Name' },
+      replace: false,
+      output: 'json',
+    });
+
+    const result = await cmd.execute();
+
+    expect(result.success).toBe(true);
+    expect(mockClient.updateRecord).toHaveBeenCalledWith('Customers', 123, { Name: 'Updated Name' });
+    expect(mockClient.replaceRecord).not.toHaveBeenCalled();
   });
 
   it('returns error when credentials are incomplete', async () => {

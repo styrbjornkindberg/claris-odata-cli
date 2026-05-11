@@ -30,12 +30,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowseCommand } from '../../../src/cli/browse';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
+import { ODataClient } from '../../../src/api/client';
 
 vi.mock('@inquirer/prompts', () => ({
   select: vi.fn(),
   input: vi.fn(),
   password: vi.fn(),
 }));
+
+vi.mock('../../../src/api/client');
 
 vi.mock('../../../src/config/credentials', () => {
   const mockListCredentials = vi.fn();
@@ -106,105 +109,80 @@ describe('BrowseCommand - table selection (CLA-1837)', () => {
   });
 
   describe('fetchTables()', () => {
-    it('returns table names from OData service document, filtering FunctionImports', async () => {
+    it('returns table names parsed from $metadata XML', async () => {
+      vi.spyOn(ODataClient.prototype, 'getMetadata').mockResolvedValue(
+        '<?xml version="1.0"?><Schema><EntitySet Name="Contacts"/><EntitySet Name="Orders"/></Schema>'
+      );
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: {
-          value: [
-            { name: 'Contacts', kind: 'EntitySet', url: 'Contacts' },
-            { name: 'Orders', kind: 'EntitySet', url: 'Orders' },
-            { name: 'GetAll', kind: 'FunctionImport', url: 'GetAll' },
-          ],
-        },
-      });
-
       const result = await cmd.fetchTables(mockServer, mockCredentials, 'MyDB');
 
       expect(result).toEqual(['Contacts', 'Orders']);
-      expect(result).not.toContain('GetAll');
     });
 
-    it('returns empty array when service document has no entries', async () => {
+    it('returns empty array when metadata has no EntitySet entries', async () => {
+      vi.spyOn(ODataClient.prototype, 'getMetadata').mockResolvedValue(
+        '<?xml version="1.0"?><Schema></Schema>'
+      );
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: { value: [] },
-      });
-
       const result = await cmd.fetchTables(mockServer, mockCredentials, 'MyDB');
 
       expect(result).toEqual([]);
     });
 
-    it('calls /fmi/odata/v4/{database} endpoint on the server', async () => {
+    it('constructs ODataClient with the target database', async () => {
+      vi.spyOn(ODataClient.prototype, 'getMetadata').mockResolvedValue(
+        '<?xml version="1.0"?><Schema></Schema>'
+      );
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      const getSpy = vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: { value: [] },
-      });
-
       await cmd.fetchTables(mockServer, mockCredentials, 'MyDB');
 
-      const url = getSpy.mock.calls[0][0];
-      expect(url).toContain('/fmi/odata/v4/MyDB');
-      expect(url).toContain('fm.example.com');
+      expect(ODataClient).toHaveBeenCalledWith(
+        expect.objectContaining({ database: 'MyDB' })
+      );
     });
 
-    it('uses Basic auth header with base64 encoded credentials', async () => {
+    it('constructs ODataClient with Basic auth token from credentials', async () => {
+      vi.spyOn(ODataClient.prototype, 'getMetadata').mockResolvedValue(
+        '<?xml version="1.0"?><Schema></Schema>'
+      );
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      const getSpy = vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: { value: [] },
-      });
-
       await cmd.fetchTables(mockServer, mockCredentials, 'MyDB');
 
-      const callArgs = getSpy.mock.calls[0];
-      const headers = (callArgs[1] as { headers?: Record<string, string> })?.headers ?? {};
-      const expectedToken = Buffer.from('alice:secret').toString('base64');
-      expect(headers['Authorization']).toBe(`Basic ${expectedToken}`);
+      const expectedToken = `Basic ${Buffer.from('alice:secret').toString('base64')}`;
+      expect(ODataClient).toHaveBeenCalledWith(
+        expect.objectContaining({ authToken: expectedToken })
+      );
     });
 
     it('throws on network/connection error', async () => {
+      vi.spyOn(ODataClient.prototype, 'getMetadata').mockRejectedValue(new Error('ECONNREFUSED'));
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockRejectedValue(new Error('ECONNREFUSED'));
-
       await expect(cmd.fetchTables(mockServer, mockCredentials, 'MyDB')).rejects.toThrow('ECONNREFUSED');
     });
 
     it('throws on auth error (401)', async () => {
+      vi.spyOn(ODataClient.prototype, 'getMetadata').mockRejectedValue(
+        new Error('Request failed with status code 401')
+      );
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockRejectedValue(new Error('Request failed with status code 401'));
-
       await expect(cmd.fetchTables(mockServer, mockCredentials, 'MyDB')).rejects.toThrow('401');
     });
 
-    it('filters all FunctionImport entries from the result', async () => {
+    it('extracts all EntitySet names from metadata including multiple EntitySets', async () => {
+      vi.spyOn(ODataClient.prototype, 'getMetadata').mockResolvedValue(
+        '<?xml version="1.0"?><Schema><EntitySet Name="FuncA"/><EntitySet Name="FuncB"/><EntitySet Name="Customers"/></Schema>'
+      );
+
       const cmd = new BrowseCommand({});
-
-      const axiosMock = await import('axios');
-      vi.spyOn(axiosMock.default, 'get').mockResolvedValue({
-        data: {
-          value: [
-            { name: 'FuncA', kind: 'FunctionImport', url: 'FuncA' },
-            { name: 'FuncB', kind: 'FunctionImport', url: 'FuncB' },
-            { name: 'Customers', kind: 'EntitySet', url: 'Customers' },
-          ],
-        },
-      });
-
       const result = await cmd.fetchTables(mockServer, mockCredentials, 'MyDB');
 
-      expect(result).toEqual(['Customers']);
+      expect(result).toEqual(['FuncA', 'FuncB', 'Customers']);
     });
   });
 

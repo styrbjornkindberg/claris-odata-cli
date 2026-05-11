@@ -3,26 +3,22 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import axios from 'axios';
 import { SchemaCommand } from '../../../src/cli/schema';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
 import { AuthManager } from '../../../src/api/auth';
+import { ODataClient } from '../../../src/api/client';
 
 vi.mock('../../../src/config/servers');
 vi.mock('../../../src/config/credentials');
 vi.mock('../../../src/api/auth');
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn(),
-  },
-}));
+vi.mock('../../../src/api/client');
 
 describe('SchemaCommand', () => {
   const mockServerManager = { getServer: vi.fn() };
   const mockCredentialsManager = { listCredentials: vi.fn(), getCredentials: vi.fn() };
   const mockAuthManager = { createBasicAuthToken: vi.fn() };
-  const mockAxiosGet = vi.mocked(axios.get);
+  const mockGetMetadata = vi.fn();
 
   const metadataXml = `
 <edmx:Edmx>
@@ -32,7 +28,7 @@ describe('SchemaCommand', () => {
         <EntitySet Name="Customers" EntityType="FileMaker.Customers" />
         <EntitySet Name="Orders" EntityType="FileMaker.Orders" />
       </EntityContainer>
-      <EntityType Name="Customers">
+      <EntityType Name="Customers_">
         <Key><PropertyRef Name="id" /></Key>
         <Property Name="id" Type="Edm.Int32" Nullable="false" />
         <Property Name="Name" Type="Edm.String" />
@@ -62,7 +58,8 @@ describe('SchemaCommand', () => {
     ]);
     mockCredentialsManager.getCredentials.mockResolvedValue('secret');
     mockAuthManager.createBasicAuthToken.mockReturnValue('Basic token');
-    mockAxiosGet.mockResolvedValue({ data: metadataXml } as any);
+    vi.mocked(ODataClient).mockImplementation(() => ({ getMetadata: mockGetMetadata }) as any);
+    mockGetMetadata.mockResolvedValue(metadataXml);
   });
 
   it('lists tables when table option is not provided', async () => {
@@ -115,6 +112,6 @@ describe('SchemaCommand', () => {
     const result = await cmd.execute();
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe("Table 'MissingTable' not found in metadata");
+    expect(result.error).toBe("Table 'MissingTable' not found in metadata (looked for EntityType 'MissingTable_')");
   });
 });

@@ -1,9 +1,9 @@
 /**
- * Update Command
+ * Script Command
  *
- * Updates an existing record in a FileMaker table.
+ * Runs a FileMaker script via the OData API.
  *
- * @module cli/update
+ * @module cli/script
  */
 
 import { BaseCommand, type CommandOptions } from './index';
@@ -11,37 +11,40 @@ import { ODataClient } from '../api/client';
 import { AuthManager } from '../api/auth';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
+import { OutputFormatter } from '../output/formatter';
 import type { CommandResult } from '../types';
 
 /**
- * Update command options
+ * Script command options
  */
-export interface UpdateOptions extends CommandOptions {
+export interface ScriptOptions extends CommandOptions {
   /** Server ID */
   serverId: string;
   /** Database name */
   database: string;
-  /** Table name */
-  table: string;
-  /** Record ID */
-  recordId: number;
-  /** Field values to update */
-  data: Record<string, unknown>;
-  /** Use PUT (full replace) instead of PATCH (partial update) */
-  replace?: boolean;
+  /** Script name */
+  name: string;
+  /** Optional table context */
+  table?: string;
+  /** Optional record ID context */
+  id?: number;
+  /** Pre-parsed script parameters */
+  params?: unknown;
 }
 
 /**
- * Update command implementation
+ * Script command implementation
  *
- * Updates an existing record in a FileMaker table.
+ * Posts to the FileMaker script endpoint and returns the raw response.
  */
-export class UpdateCommand extends BaseCommand<UpdateOptions> {
-  /**
-   * Execute the update command
-   *
-   * @returns Command result with updated record
-   */
+export class ScriptCommand extends BaseCommand<ScriptOptions> {
+  private formatter: OutputFormatter;
+
+  constructor(options: ScriptOptions) {
+    super(options);
+    this.formatter = new OutputFormatter(options.output ?? 'json');
+  }
+
   async execute(): Promise<CommandResult> {
     try {
       const serverManager = new ServerManager();
@@ -65,25 +68,25 @@ export class UpdateCommand extends BaseCommand<UpdateOptions> {
         };
       }
 
-      const password = await credentialsManager.getCredentials(
+      const credentials = await credentialsManager.getCredentials(
         this.options.serverId,
         entry.database,
         entry.username
       );
 
-      if (!password) {
+      if (!credentials) {
         return {
           success: false,
           error: `Stored credentials are incomplete for server '${this.options.serverId}' and database '${this.options.database}'`,
         };
       }
 
-      const protocol = server.secure !== false ? 'https' : 'http';
+      const protocol = (server.secure ?? true) ? 'https' : 'http';
       const port = server.port ?? 443;
       const baseUrl = `${protocol}://${server.host}:${port}`;
 
       const authManager = new AuthManager();
-      const authToken = authManager.createBasicAuthToken(entry.username, password);
+      const authToken = authManager.createBasicAuthToken(entry.username, credentials);
 
       const client = new ODataClient({
         baseUrl,
@@ -91,20 +94,28 @@ export class UpdateCommand extends BaseCommand<UpdateOptions> {
         authToken,
       });
 
-      const updated = this.options.replace
-        ? await client.replaceRecord(this.options.table, this.options.recordId, this.options.data)
-        : await client.updateRecord(this.options.table, this.options.recordId, this.options.data);
+      const data = await client.runScript(this.options.name, {
+        table: this.options.table,
+        recordId: this.options.id,
+        params: this.options.params,
+      });
 
-      return {
-        success: true,
-        data: updated,
-      };
+      return { success: true, data };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        error: message,
-      };
+      return { success: false, error: message };
     }
+  }
+
+  formatOutput(result: CommandResult): string {
+    if (!result.success) {
+      return this.formatter.formatJson({
+        type: 'error',
+        code: 'SCRIPT_FAILED',
+        message: result.error ?? 'Unknown error',
+      });
+    }
+
+    return this.formatter.formatJson(result.data);
   }
 }

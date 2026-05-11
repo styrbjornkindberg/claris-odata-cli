@@ -31,18 +31,17 @@ vi.mock('../../../src/config/credentials', () => ({
   })),
 }));
 
-// Mock axios
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn().mockResolvedValue({
-      data: {
-        value: [
-          { name: 'Database1', kind: 'EntityContainer' },
-          { name: 'Database2', kind: 'EntityContainer' },
-        ],
-      },
-    }),
-  },
+// Mock ODataClient
+vi.mock('../../../src/api/client', () => ({
+  ODataClient: vi.fn().mockImplementation(() => ({
+    getServiceDocument: vi.fn().mockResolvedValue([
+      { name: 'Database1', kind: 'EntityContainer' },
+      { name: 'Database2', kind: 'EntityContainer' },
+    ]),
+    getMetadata: vi.fn().mockResolvedValue(
+      '<?xml version="1.0"?><Schema><EntitySet Name="Table1"/><EntitySet Name="Table2"/></Schema>'
+    ),
+  })),
 }));
 
 // Mock fs
@@ -135,8 +134,11 @@ describe('InitCommand', () => {
 
   describe('error handling', () => {
     it('should handle API errors gracefully', async () => {
-      const axios = await import('axios');
-      vi.mocked(axios.default.get).mockRejectedValueOnce(new Error('Network error'));
+      const { ODataClient } = await import('../../../src/api/client');
+      vi.mocked(ODataClient).mockImplementationOnce(() => ({
+        getServiceDocument: vi.fn().mockRejectedValue(new Error('Network error')),
+        getMetadata: vi.fn().mockRejectedValue(new Error('Network error')),
+      }) as never);
 
       const cmd = new InitCommand({});
       const result = await cmd.execute();

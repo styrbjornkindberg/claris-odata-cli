@@ -6,10 +6,25 @@
  * @module config/servers
  */
 
+import { createHash } from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import type { Server } from '../types';
+
+/**
+ * Deterministic server ID derived from name + host.
+ * Same inputs always produce the same ID, so re-registering a server
+ * does not orphan stored keychain credentials.
+ */
+export function buildServerId(name: string, host: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const suffix = createHash('sha256').update(`${name}:${host}`).digest('hex').slice(0, 8);
+  return `${slug}-${suffix}`;
+}
 
 const CONFIG_DIR = path.join(os.homedir(), '.config', 'claris-odata-cli');
 const SERVERS_FILE = path.join(CONFIG_DIR, 'servers.json');
@@ -105,7 +120,7 @@ export class ServerManager {
    * @returns The added server
    */
   addServer(config: Omit<Server, 'id'>): Server {
-    const id = this.generateId(config.name);
+    const id = buildServerId(config.name, config.host);
     const server: Server = {
       ...config,
       id,
@@ -144,17 +159,5 @@ export class ServerManager {
    */
   removeServer(id: string): boolean {
     return serverStore.delete(id);
-  }
-
-  /**
-   * Generate a unique ID for a server
-   *
-   * @param name - Server name
-   * @returns Unique ID
-   */
-  private generateId(name: string): string {
-    const sanitized = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
-    const timestamp = Date.now().toString(36);
-    return `${sanitized}-${timestamp}`;
   }
 }

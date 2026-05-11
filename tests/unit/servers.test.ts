@@ -5,7 +5,37 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ServerManager, serverStore } from '../../src/config/servers';
+import { buildServerId, ServerManager, serverStore } from '../../src/config/servers';
+
+describe('buildServerId', () => {
+  it('returns the same ID for the same name and host', () => {
+    const id1 = buildServerId('tethys', 'tethys.squaremoon.se');
+    const id2 = buildServerId('tethys', 'tethys.squaremoon.se');
+    expect(id1).toBe(id2);
+  });
+
+  it('returns different IDs for different hosts', () => {
+    const id1 = buildServerId('prod', 'host1.example.com');
+    const id2 = buildServerId('prod', 'host2.example.com');
+    expect(id1).not.toBe(id2);
+  });
+
+  it('returns different IDs for different names with same host', () => {
+    const id1 = buildServerId('prod', 'example.com');
+    const id2 = buildServerId('staging', 'example.com');
+    expect(id1).not.toBe(id2);
+  });
+
+  it('formats as slug-8hexchars', () => {
+    const id = buildServerId('My Server', 'example.com');
+    expect(id).toMatch(/^[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$/);
+  });
+
+  it('sanitizes special characters in name slug', () => {
+    const id = buildServerId('My Server!!', 'example.com');
+    expect(id).not.toMatch(/[^a-z0-9-]/);
+  });
+});
 
 describe('ServerManager', () => {
   let manager: ServerManager;
@@ -51,6 +81,20 @@ describe('ServerManager', () => {
 
       expect(server.port).toBe(8080);
       expect(server.secure).toBe(false);
+    });
+
+    it('generates the same ID for the same name and host', () => {
+      const s1 = manager.addServer({ name: 'Prod', host: 'fms.example.com' });
+      serverStore.delete(s1.id);
+      const s2 = manager.addServer({ name: 'Prod', host: 'fms.example.com' });
+      expect(s1.id).toBe(s2.id);
+    });
+
+    it('overwrites an existing server when re-added with same name+host', () => {
+      manager.addServer({ name: 'Prod', host: 'fms.example.com', port: 443 });
+      const updated = manager.addServer({ name: 'Prod', host: 'fms.example.com', port: 8080 });
+      expect(updated.port).toBe(8080);
+      expect(manager.listServers()).toHaveLength(1);
     });
   });
 

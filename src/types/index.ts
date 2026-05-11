@@ -101,6 +101,26 @@ export interface QueryOptions {
 }
 
 /**
+ * Paginated collection response from OData endpoint
+ */
+export interface ODataCollection<T> {
+  value: T[];
+  '@odata.count'?: number;
+  '@odata.nextLink'?: string;
+}
+
+/**
+ * Structured result returned by getRecords
+ */
+export interface QueryResult<T> {
+  records: T[];
+  /** Populated when options.count === true */
+  count?: number;
+  /** @odata.nextLink if present */
+  nextLink?: string;
+}
+
+/**
  * FileMaker record representation
  */
 export interface Record {
@@ -186,6 +206,21 @@ export type BrowseLevel = 'server' | 'database' | 'table' | 'action';
  * const action: BrowseAction = 'list-records';
  */
 export type BrowseAction = 'list-records' | 'get-record' | 'create-record' | 'view-schema';
+
+// ============================================================================
+// Batch Types
+// ============================================================================
+
+/**
+ * A single request in a batch operation
+ */
+export interface BatchRequest {
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  /** URL relative to the database root, e.g. "Contacts?$top=5" */
+  url: string;
+  /** Optional request body for POST/PATCH/PUT */
+  body?: { [key: string]: unknown };
+}
 
 // ============================================================================
 // Logger Types

@@ -20,6 +20,7 @@ const mockServer = {
 };
 
 vi.mock('../../../src/config/servers', () => ({
+  buildServerId: vi.fn().mockReturnValue('srv-1'),
   ServerManager: vi.fn().mockImplementation(() => ({
     listServers: vi.fn().mockReturnValue([]),
     addServer: vi.fn().mockReturnValue({
@@ -29,7 +30,7 @@ vi.mock('../../../src/config/servers', () => ({
       port: 443,
       secure: true,
     }),
-    getServer: vi.fn(),
+    getServer: vi.fn().mockReturnValue(undefined),
     removeServer: vi.fn().mockReturnValue(true),
   })),
 }));
@@ -96,23 +97,23 @@ describe('ServerCommand - subcommands', () => {
       });
     });
 
-    it('rejects duplicate server name', async () => {
+    it('succeeds (upserts) when re-adding a server with the same name+host (T13)', async () => {
       vi.mocked(ServerManager).mockImplementation(() => ({
         listServers: vi.fn().mockReturnValue([mockServer]),
-        addServer: vi.fn(),
-        getServer: vi.fn(),
+        addServer: vi.fn().mockReturnValue(mockServer),
+        getServer: vi.fn().mockReturnValue(mockServer),
         removeServer: vi.fn(),
       }));
 
       const cmd = new ServerCommand({
         action: 'add',
         name: 'Prod',
-        host: 'other.example.com',
+        host: 'fm.example.com',
       });
       const result = await cmd.execute();
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('already exists');
+      expect(result.success).toBe(true);
+      expect((result.data as Record<string, unknown>).message).toContain('updated');
     });
   });
 

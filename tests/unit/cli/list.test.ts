@@ -3,18 +3,14 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import axios from 'axios';
 import { ListCommand } from '../../../src/cli/list';
+import { ODataClient } from '../../../src/api/client';
 import { ServerManager } from '../../../src/config/servers';
 import { CredentialsManager } from '../../../src/config/credentials';
 
 vi.mock('../../../src/config/servers');
 vi.mock('../../../src/config/credentials');
-vi.mock('axios', () => ({
-  default: {
-    get: vi.fn(),
-  },
-}));
+vi.mock('../../../src/api/client');
 
 describe('ListCommand', () => {
   const mockServerManager = {
@@ -27,13 +23,18 @@ describe('ListCommand', () => {
     getCredentials: vi.fn(),
   };
 
-  const mockAxiosGet = vi.mocked(axios.get);
+  const mockGetServiceDocument = vi.fn();
+  const mockGetMetadata = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     vi.mocked(ServerManager).mockImplementation(() => mockServerManager as never);
     vi.mocked(CredentialsManager).mockImplementation(() => mockCredentialsManager as never);
+    vi.mocked(ODataClient).mockImplementation(() => ({
+      getServiceDocument: mockGetServiceDocument,
+      getMetadata: mockGetMetadata,
+    } as never));
 
     mockServerManager.listServers.mockReturnValue([
       { id: 'prod', name: 'Production', host: 'fm.example.com', port: 443, secure: true },
@@ -72,14 +73,10 @@ describe('ListCommand', () => {
   });
 
   it('lists databases from the service document', async () => {
-    mockAxiosGet.mockResolvedValue({
-      data: {
-        value: [
-          { name: 'Sales', kind: 'EntityContainer', url: 'Sales' },
-          { name: 'HR', kind: 'EntityContainer', url: 'HR' },
-        ],
-      },
-    } as never);
+    mockGetServiceDocument.mockResolvedValue([
+      { name: 'Sales', kind: 'EntityContainer', url: 'Sales' },
+      { name: 'HR', kind: 'EntityContainer', url: 'HR' },
+    ]);
 
     const cmd = new ListCommand({
       resource: 'databases',
@@ -101,20 +98,18 @@ describe('ListCommand', () => {
   });
 
   it('lists tables from metadata for a specific database', async () => {
-    mockAxiosGet.mockResolvedValue({
-      data: `
-        <edmx:Edmx>
-          <edmx:DataServices>
-            <Schema>
-              <EntityContainer>
-                <EntitySet Name="Customers" EntityType="FileMaker.Customers" />
-                <EntitySet Name="Orders" EntityType="FileMaker.Orders" />
-              </EntityContainer>
-            </Schema>
-          </edmx:DataServices>
-        </edmx:Edmx>
-      `,
-    } as never);
+    mockGetMetadata.mockResolvedValue(`
+      <edmx:Edmx>
+        <edmx:DataServices>
+          <Schema>
+            <EntityContainer>
+              <EntitySet Name="Customers" EntityType="FileMaker.Customers" />
+              <EntitySet Name="Orders" EntityType="FileMaker.Orders" />
+            </EntityContainer>
+          </Schema>
+        </edmx:DataServices>
+      </edmx:Edmx>
+    `);
 
     const cmd = new ListCommand({
       resource: 'tables',

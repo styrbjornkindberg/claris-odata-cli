@@ -7,7 +7,7 @@
  */
 
 import { BaseCommand, type CommandOptions } from './index';
-import axios from 'axios';
+import { ODataClient } from '../api/client';
 import { AuthManager } from '../api/auth';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
@@ -79,18 +79,9 @@ export class SchemaCommand extends BaseCommand<SchemaOptions> {
       const authManager = new AuthManager();
       const authToken = authManager.createBasicAuthToken(entry.username, password);
 
-      const metadataUrl = `${baseUrl}/fmi/odata/v4/${encodeURIComponent(this.options.database)}/$metadata`;
-      const response = await axios.get<string>(metadataUrl, {
-        headers: {
-          Authorization: authToken,
-          Accept: 'application/xml',
-          'OData-Version': '4.0',
-          'OData-MaxVersion': '4.0',
-        },
-        timeout: 30000,
-      });
+      const client = new ODataClient({ baseUrl, database: this.options.database, authToken });
+      const xml = await client.getMetadata();
 
-      const xml = response.data;
       const tableMatches = [...xml.matchAll(/<EntitySet\s+Name="([^"]+)"/g)];
       const tables = tableMatches.map((m) => m[1]);
 
@@ -106,8 +97,10 @@ export class SchemaCommand extends BaseCommand<SchemaOptions> {
       }
 
       const table = this.options.table;
+      // FileMaker OData appends "_" to EntityType names (e.g. "CONTACTS" → "CONTACTS_")
+      const entityTypeName = `${table}_`;
       const entityTypeRegex = new RegExp(
-        `<EntityType\\s+Name=\\"${table.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\"[\\s\\S]*?<\\/EntityType>`,
+        `<EntityType\\s+Name=\\"${entityTypeName.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&')}\\"[\\s\\S]*?<\\/EntityType>`,
         'i'
       );
       const section = xml.match(entityTypeRegex)?.[0];
@@ -115,7 +108,7 @@ export class SchemaCommand extends BaseCommand<SchemaOptions> {
       if (!section) {
         return {
           success: false,
-          error: `Table '${table}' not found in metadata`,
+          error: `Table '${table}' not found in metadata (looked for EntityType '${entityTypeName}')`,
         };
       }
 

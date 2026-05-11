@@ -11,22 +11,16 @@
  * @module cli/init
  */
 
-import axios from 'axios';
 import { homedir } from 'os';
 import { join } from 'path';
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import { BaseCommand, type CommandOptions } from './index';
+import { ODataClient } from '../api/client';
+import { AuthManager } from '../api/auth';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
 import { c } from '../lib/theme';
 import type { CommandResult, CredentialEntry } from '../types';
-
-/**
- * OData service document response shape
- */
-interface ODataServiceDocument {
-  value: Array<{ name: string; kind: string; url: string }>;
-}
 
 /**
  * Context structure for saved configuration
@@ -249,30 +243,18 @@ export class InitCommand extends BaseCommand<InitOptions> {
     const protocol = server.secure !== false ? 'https' : 'http';
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
-
-    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString(
-      'base64'
+    const authToken = new AuthManager().createBasicAuthToken(
+      credentials.username,
+      credentials.password
     );
 
     try {
-      const response = await axios.get<ODataServiceDocument>(`${baseUrl}/fmi/odata/v4`, {
-        headers: {
-          Authorization: `Basic ${authToken}`,
-          Accept: 'application/json',
-          'OData-Version': '4.0',
-          'OData-MaxVersion': '4.0',
-        },
-        timeout: 30000,
-      });
-
-      const entries = response.data?.value ?? [];
+      const client = new ODataClient({ baseUrl, database: '', authToken });
+      const entries = await client.getServiceDocument();
       return entries
-        .filter(
-          (e: { kind?: string; name?: string }) =>
-            e.kind === 'EntityContainer' || e.kind === undefined || e.kind !== 'FunctionImport'
-        )
-        .map((e: { name?: string }) => e.name)
-        .filter(Boolean) as string[];
+        .filter((e) => e.kind !== 'FunctionImport')
+        .map((e) => e.name)
+        .filter(Boolean);
     } catch {
       return [];
     }
@@ -294,30 +276,16 @@ export class InitCommand extends BaseCommand<InitOptions> {
     const protocol = server.secure !== false ? 'https' : 'http';
     const port = server.port ?? 443;
     const baseUrl = `${protocol}://${server.host}:${port}`;
-
-    const authToken = Buffer.from(`${credentials.username}:${credentials.password}`).toString(
-      'base64'
+    const authToken = new AuthManager().createBasicAuthToken(
+      credentials.username,
+      credentials.password
     );
 
     try {
-      const response = await axios.get<ODataServiceDocument>(
-        `${baseUrl}/fmi/odata/v4/${encodeURIComponent(database)}`,
-        {
-          headers: {
-            Authorization: `Basic ${authToken}`,
-            Accept: 'application/json',
-            'OData-Version': '4.0',
-            'OData-MaxVersion': '4.0',
-          },
-          timeout: 30000,
-        }
-      );
-
-      const entries = response.data?.value ?? [];
-      return entries
-        .filter((e: { kind?: string }) => e.kind !== 'FunctionImport')
-        .map((e: { name?: string }) => e.name)
-        .filter(Boolean) as string[];
+      const client = new ODataClient({ baseUrl, database, authToken });
+      const xml = await client.getMetadata();
+      const tableMatches = [...xml.matchAll(/<EntitySet\s+Name="([^"]+)"/g)];
+      return tableMatches.map((m) => m[1]).filter(Boolean);
     } catch {
       return [];
     }

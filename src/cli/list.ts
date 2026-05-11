@@ -10,25 +10,8 @@ import { BaseCommand, type CommandOptions } from './index';
 import type { CommandResult } from '../types';
 import { ServerManager } from '../config/servers';
 import { CredentialsManager } from '../config/credentials';
-import axios from 'axios';
-
-interface ODataServiceEntry {
-  name: string;
-  kind?: string;
-  url?: string;
-}
-
-interface ODataServiceDocument {
-  value?: ODataServiceEntry[];
-}
-
-interface HttpErrorShape {
-  code?: string;
-  message?: string;
-  response?: {
-    status?: number;
-  };
-}
+import { ODataClient } from '../api/client';
+import { AuthManager } from '../api/auth';
 
 /**
  * List command options
@@ -124,7 +107,6 @@ export class ListCommand extends BaseCommand<ListOptions> {
     }
 
     try {
-      // Get credentials
       const credentialsManager = new CredentialsManager();
       const credentials = await credentialsManager.listCredentials(this.options.serverId);
 
@@ -135,7 +117,6 @@ export class ListCommand extends BaseCommand<ListOptions> {
         };
       }
 
-      // Use first credential
       const cred = credentials[0];
       const password = await credentialsManager.getCredentials(
         this.options.serverId,
@@ -150,25 +131,18 @@ export class ListCommand extends BaseCommand<ListOptions> {
         };
       }
 
-      // Get databases from server
-      const protocol = server.port === 443 ? 'https' : 'http';
-      const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}/fmi/odata/v4`;
-      const authToken = Buffer.from(`${cred.username}:${password}`).toString('base64');
+      const protocol = (server.secure ?? true) ? 'https' : 'http';
+      const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}`;
+      const authToken = new AuthManager().createBasicAuthToken(cred.username, password);
 
-      const response = await axios.get<ODataServiceDocument>(`${baseUrl}/`, {
-        headers: { Authorization: `Basic ${authToken}` },
-        timeout: 10000,
-      });
+      const client = new ODataClient({ baseUrl, database: cred.database, authToken });
+      const entries = await client.getServiceDocument();
 
-      // Parse the service document response
-      // FileMaker OData returns a list of databases in the service document
-      const data = response.data;
-      const databases =
-        data.value?.map((db) => ({
-          name: db.name,
-          kind: db.kind,
-          url: db.url,
-        })) ?? [];
+      const databases = entries.map((db) => ({
+        name: db.name,
+        kind: db.kind,
+        url: db.url,
+      }));
 
       return {
         success: true,
@@ -181,36 +155,9 @@ export class ListCommand extends BaseCommand<ListOptions> {
     } catch (error: unknown) {
       return {
         success: false,
-        error: this.formatError(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
-  }
-
-  /**
-   * Format error message
-   */
-  private formatError(error: unknown): string {
-    const parsed = error as HttpErrorShape;
-
-    if (parsed.code === 'ECONNREFUSED') {
-      return 'Connection refused';
-    }
-    if (parsed.code === 'ETIMEDOUT' || parsed.code === 'ECONNABORTED') {
-      return 'Connection timeout';
-    }
-    if (parsed.code === 'ENOTFOUND') {
-      return 'Host not found';
-    }
-    if (parsed.response?.status === 401) {
-      return 'Authentication failed';
-    }
-    if (parsed.response?.status === 404) {
-      return 'Server not found';
-    }
-    if (parsed.response?.status === 500) {
-      return 'Server error';
-    }
-    return parsed.message ?? 'Unknown error';
   }
 
   /**
@@ -269,24 +216,14 @@ export class ListCommand extends BaseCommand<ListOptions> {
         };
       }
 
-      const protocol = server.port === 443 ? 'https' : 'http';
-      const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}/fmi/odata/v4`;
-      const authToken = Buffer.from(`${entry.username}:${password}`).toString('base64');
+      const protocol = (server.secure ?? true) ? 'https' : 'http';
+      const baseUrl = `${protocol}://${server.host}:${server.port ?? 443}`;
+      const authToken = new AuthManager().createBasicAuthToken(entry.username, password);
 
-      const response = await axios.get<string>(
-        `${baseUrl}/${encodeURIComponent(this.options.database)}/$metadata`,
-        {
-          headers: {
-            Authorization: `Basic ${authToken}`,
-            Accept: 'application/xml',
-            'OData-Version': '4.0',
-            'OData-MaxVersion': '4.0',
-          },
-          timeout: 10000,
-        }
-      );
+      const client = new ODataClient({ baseUrl, database: this.options.database, authToken });
+      const xml = await client.getMetadata();
 
-      const tables = [...response.data.matchAll(/<EntitySet\s+Name="([^"]+)"/g)].map((match) => ({
+      const tables = [...xml.matchAll(/<EntitySet\s+Name="([^"]+)"/g)].map((match) => ({
         name: match[1],
       }));
 
@@ -302,7 +239,7 @@ export class ListCommand extends BaseCommand<ListOptions> {
     } catch (error: unknown) {
       return {
         success: false,
-        error: this.formatError(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
