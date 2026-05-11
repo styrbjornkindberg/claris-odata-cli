@@ -1,6 +1,6 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-**Last updated:** 2026-05-11 (session 12)
+**Last updated:** 2026-05-11 (session 13)
 **Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
 
@@ -28,14 +28,15 @@ binary download issue in this environment — ignore it, the right version is al
 | T11 | `165e35c` | Coverage sweep: `@vitest/coverage-v8` added; `profiles.test.ts` (22 tests, 0→100%); 429 NaN retry-after + empty-options branches in client tests; health latency threshold de-flaked; overall 83.15%, api/client.ts + api/prefer.ts 100% |
 | T12 | `15b2cc4` | `docs/SMOKE_TEST.md` — manual checklist: health, list databases/tables, get, get --count, get w/ query opts, script (3 URL variants + params + invalid JSON guard), upload (txt + jpeg), error paths, cleanup |
 | Smoke-fix | `41d2e13` | Live smoke test against tethys.squaremoon.se found 2 bugs: Commander option shadowing broke all commands with -s/-d; FileMaker EntityType suffix "_" broke `schema <table>`. Both fixed, 606 tests pass. |
+| T13 | `9748bb4` | Stable server IDs: `buildServerId(name, host)` → SHA-256 8-char suffix; idempotent re-add prints "updated"; 615 tests pass. |
 
-**Current state:** 43 test files, 606 tests passing, 0 lint errors, build clean.
+**Current state:** 43 test files, 615 tests passing, 0 lint errors, build clean.
 
 ---
 
-## Start Here: T13
+## Start Here: Checkpoint C
 
-**Goal:** Stable server IDs — `server add` currently generates a random suffix on every invocation, orphaning stored keychain credentials on re-registration. Replace with a deterministic ID derived from server name + host.
+**Goal:** Code review of the full branch diff (`main..feature/odata-conformance-sweep`) before merge.
 
 ---
 
@@ -307,17 +308,17 @@ Phase 2: ✅ T3  ✅ T4  ✅ T5  ✅ Checkpoint B
 Phase 3: ✅ T6  ✅ T7
 Phase 4: ✅ T8  ✅ T9  ✅ T10  ⬜ Checkpoint C
 Phase 5: ✅ T11  ✅ T12  ✅ Smoke-fix
-Phase 6: ⬜ T13  ⬜ Checkpoint C  ⬜ Checkpoint D
+Phase 6: ✅ T13  ⬜ Checkpoint C  ⬜ Checkpoint D
 ```
 
 ## Repo State
 
 ```
 Branch:      feature/odata-conformance-sweep
-Last commit: 41d2e13 fix: Commander option shadowing + schema EntityType suffix
-Tests:       43 files, 606 passing
+Last commit: 9748bb4 feat(T13): stable deterministic server IDs from name+host hash
+Tests:       43 files, 615 passing
 Coverage:    83.15% stmt/lines, 81.21% branch, 88.37% fn — all ≥ 80%
              api/client.ts 100%, api/prefer.ts 100%, config/profiles.ts 100%
-Lint:        0 errors, 49 warnings (all pre-existing explicit-return-type in test files)
+Lint:        0 errors, 51 warnings (all pre-existing explicit-return-type in test files)
 Build:       clean
 ```
