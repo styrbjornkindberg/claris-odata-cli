@@ -33,6 +33,54 @@ export type ToolResult = {
 };
 
 /**
+ * Split a command string into an argument array using shell-style tokenization.
+ * Supports single and double quotes so filter expressions and JSON values with
+ * spaces are passed as single arguments, e.g.:
+ *   `get Contacts --filter "Status eq 'Active'"` →
+ *   ['get', 'Contacts', '--filter', "Status eq 'Active'"]
+ */
+export function parseCommandString(command: string): string[] {
+  const args: string[] = [];
+  let current = '';
+  let i = 0;
+
+  while (i < command.length) {
+    const ch = command[i];
+
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      i++;
+      while (i < command.length && command[i] !== quote) {
+        // honour backslash escapes inside double quotes only
+        if (ch === '"' && command[i] === '\\' && i + 1 < command.length) {
+          i++;
+          current += command[i];
+        } else {
+          current += command[i];
+        }
+        i++;
+      }
+      i++; // skip closing quote
+    } else if (ch === ' ' || ch === '\t') {
+      if (current.length > 0) {
+        args.push(current);
+        current = '';
+      }
+      i++;
+    } else {
+      current += ch;
+      i++;
+    }
+  }
+
+  if (current.length > 0) {
+    args.push(current);
+  }
+
+  return args;
+}
+
+/**
  * Factory that creates and configures the McpServer instance.
  * Exported separately so tests can call it without connecting a transport.
  */
@@ -46,7 +94,7 @@ export function createMcpServer(): {
   // ─── fmo_help ───────────────────────────────────────────────────────────────
 
   async function helpHandler(args: { command?: string }): Promise<ToolResult> {
-    const tokens = args.command?.trim() ? args.command.trim().split(/\s+/) : [];
+    const tokens = args.command?.trim() ? parseCommandString(args.command.trim()) : [];
     const execArgs = [...tokens, '--help'];
     try {
       const { stdout, stderr } = await execFileAsync('node', [fmoBin, ...execArgs], {
@@ -80,7 +128,7 @@ export function createMcpServer(): {
   // ─── fmo_run ────────────────────────────────────────────────────────────────
 
   async function runHandler(args: { command: string }): Promise<ToolResult> {
-    const execArgs = args.command.trim().split(/\s+/);
+    const execArgs = parseCommandString(args.command.trim());
     try {
       const { stdout, stderr } = await execFileAsync('node', [fmoBin, ...execArgs], {
         timeout: 90_000,
@@ -101,9 +149,10 @@ export function createMcpServer(): {
     {
       description:
         'Execute any fmo CLI command against a FileMaker OData API. ' +
-        'Pass arguments as you would after "fmo", ' +
-        'e.g. "list Contacts --server myserver --json". ' +
-        'Note: arguments are split on whitespace — do not use shell quoting.',
+        'Pass arguments as you would after "fmo". ' +
+        'Shell-style quoting is supported — wrap values that contain spaces in ' +
+        'single or double quotes, e.g. ' +
+        '"get Contacts --filter \\"Status eq \'Active\'\\"".',
       inputSchema: z.object({
         command: z
           .string()

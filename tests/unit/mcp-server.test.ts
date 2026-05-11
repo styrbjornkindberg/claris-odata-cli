@@ -13,7 +13,7 @@ vi.mock('child_process', () => ({
 }));
 
 // Import after mock declaration so promisify picks up the mock
-import { createMcpServer, ToolResult } from '../../src/mcp-server';
+import { createMcpServer, parseCommandString, ToolResult } from '../../src/mcp-server';
 
 const mockExecFile = vi.mocked(execFile);
 
@@ -38,6 +38,42 @@ function mockExecFailure(message: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+// ─── parseCommandString ───────────────────────────────────────────────────────
+
+describe('parseCommandString()', () => {
+  it('splits plain whitespace-separated tokens', () => {
+    expect(parseCommandString('list Contacts --server myserver')).toEqual([
+      'list', 'Contacts', '--server', 'myserver',
+    ]);
+  });
+
+  it('preserves double-quoted argument as a single token', () => {
+    expect(parseCommandString('get Contacts --filter "Status eq \'Active\'"')).toEqual([
+      'get', 'Contacts', '--filter', "Status eq 'Active'",
+    ]);
+  });
+
+  it('preserves single-quoted argument as a single token', () => {
+    expect(parseCommandString("get Contacts --filter 'Name eq John'")).toEqual([
+      'get', 'Contacts', '--filter', 'Name eq John',
+    ]);
+  });
+
+  it('handles quoted JSON data containing spaces', () => {
+    expect(parseCommandString('create Contacts --data \'{"Name":"Jane Doe","Age":30}\'')).toEqual([
+      'create', 'Contacts', '--data', '{"Name":"Jane Doe","Age":30}',
+    ]);
+  });
+
+  it('collapses extra whitespace between tokens', () => {
+    expect(parseCommandString('list   Contacts')).toEqual(['list', 'Contacts']);
+  });
+
+  it('handles empty string', () => {
+    expect(parseCommandString('')).toEqual([]);
+  });
 });
 
 // ─── Test 1: tool registration ────────────────────────────────────────────────
@@ -110,6 +146,22 @@ describe('fmo_run tool', () => {
     expect(result.content[0].text).toContain('main output');
     expect(result.content[0].text).toContain('--- stderr ---');
     expect(result.content[0].text).toContain('some warning');
+  });
+
+  it('passes quoted filter expression as a single argument', async () => {
+    mockExecSuccess('filtered results');
+    const { tools } = createMcpServer();
+
+    await tools.get('fmo_run')!({
+      command: "get Contacts --filter \"Status eq 'Active'\" --server myserver",
+    });
+
+    const callArgs = mockExecFile.mock.calls[0];
+    // --filter and its value must be separate elements; the value must be whole
+    const argsArray = callArgs[1] as string[];
+    const filterIdx = argsArray.indexOf('--filter');
+    expect(filterIdx).toBeGreaterThan(-1);
+    expect(argsArray[filterIdx + 1]).toBe("Status eq 'Active'");
   });
 
   it('returns isError: true when command exits with non-zero', async () => {
