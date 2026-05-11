@@ -27,3 +27,13 @@ Companion to [`plan.md`](plan.md). Single-page checklist for tracking progress.
 - [ ] **T11** Centralize `formatError`; kill `as HttpErrorShape`; simplify `browse.ts` filter; route auth through `AuthManager` (M)
 - [ ] **T12** Quality gates + smoke checklist; tick every box in `SPEC.md` § Success Criteria (S)
 - [ ] **Checkpoint D** — PR opened, linked to `SPEC.md`
+
+---
+
+## MCP Server (SPEC-MCP.md)
+
+- [ ] **M1** Update `package.json` — add `@modelcontextprotocol/sdk`, `zod` deps; `fmodata-mcp` bin; `mcp` script (XS)
+- [ ] **M2** Write failing tests — `tests/unit/mcp-server.test.ts`, 6 test cases, RED (S)
+- [ ] **M3** Implement `src/mcp-server.ts` — port from favro-cli, adapted names/timeouts, GREEN (S)
+- [ ] **M4** Build + acceptance check + commit (XS)
+- [ ] **Checkpoint** — `npm test` + `npm run build` green, all SPEC-MCP.md criteria ticked

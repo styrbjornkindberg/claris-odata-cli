@@ -375,3 +375,144 @@ Two-agent split is safe along this seam:
 - **Agent B:** Tasks 4, 5, 6, 7, 8, 9, 10 (Prefer + QueryResult + new commands)
 
 Agent B blocks on Agent A's Task 3 (EndpointBuilder adoption). Everything after that can run in parallel within each agent's lane.
+
+---
+
+# Implementation Plan: fmo MCP Server
+
+Source spec: [`SPEC-MCP.md`](../SPEC-MCP.md). Generated 2026-05-11.
+
+## Overview
+
+Four linear tasks that port the favro-cli MCP server pattern to claris-odata-cli. Total new code: ~100 lines source + ~120 lines tests. No changes to existing commands.
+
+## Dependency Graph
+
+```
+M1 (package.json: deps + bin + script)
+  └── M2 (write failing tests — RED)
+        └── M3 (implement src/mcp-server.ts — GREEN)
+              └── M4 (build + acceptance check + commit)
+```
+
+All tasks are linear. No parallelisation needed — the set is too small.
+
+---
+
+## Tasks
+
+### M1: Update `package.json`
+
+**Description:** Install two new runtime deps and register the new binary + npm script. No source code changes.
+
+**Changes:**
+- `dependencies`: add `@modelcontextprotocol/sdk` (latest `^1.x`) and `zod` (latest `^3.x`)
+- `bin`: add `"fmodata-mcp": "dist/mcp-server.js"`
+- `scripts`: add `"mcp": "node dist/mcp-server.js"`
+
+**Acceptance:**
+- [ ] `npm install` succeeds with no peer-dep warnings
+- [ ] `package.json` contains the new `bin` and `scripts` entries
+- [ ] `node_modules/@modelcontextprotocol/sdk` and `node_modules/zod` present
+
+**Verification:** `npm install && node -e "require('@modelcontextprotocol/sdk/server/mcp.js'); require('zod')"` exits 0
+
+**Dependencies:** None
+
+**Files:** `package.json`, `package-lock.json`
+
+**Scope:** XS
+
+---
+
+### M2: Write failing tests — RED
+
+**Description:** Create `tests/unit/mcp-server.test.ts` with all 6 test cases from the spec. Tests must FAIL at this point (no source file yet). Uses vitest `vi.mock` for `child_process`.
+
+**Test cases (spec §Testing Strategy):**
+
+| # | Describe | Test |
+|---|----------|------|
+| 1 | `createMcpServer()` | registers exactly 2 tools: `fmo_help` and `fmo_run` |
+| 2 | `fmo_help` | calls cli with `--help` when no command given |
+| 3 | `fmo_help` | appends `--help` after command tokens (`"credentials add"` → `['credentials','add','--help']`) |
+| 4 | `fmo_run` | returns stdout as text content |
+| 5 | `fmo_run` | appends stderr under `--- stderr ---` separator when non-empty |
+| 6 | `fmo_run` | returns `isError: true` when command exits non-zero |
+
+**Mock shape:** `vi.mock('child_process', ...)` replacing `execFile` with a vitest `vi.fn()`. Helper fns `mockExecSuccess(stdout, stderr?)` and `mockExecFailure(message)` match the favro-cli test pattern.
+
+**Binary path assertion:** `fmo_help` test #2 asserts `callArgs[1]` contains `expect.stringContaining('index.js')` (not `cli.js`).
+
+**Acceptance:**
+- [ ] `npm test` shows 6 failing tests in `mcp-server.test.ts`
+- [ ] No other test files fail
+
+**Dependencies:** M1
+
+**Files:** `tests/unit/mcp-server.test.ts`
+
+**Scope:** S
+
+---
+
+### M3: Implement `src/mcp-server.ts` — GREEN
+
+**Description:** Port `favro-cli/src/mcp-server.ts` with these adaptations:
+
+| favro-cli | fmo |
+|-----------|-----|
+| `favroBin = path.resolve(__dirname, 'cli.js')` | `fmoBin = path.resolve(__dirname, 'index.js')` |
+| tool names `favro_help` / `favro_run` | `fmo_help` / `fmo_run` |
+| server name `'favro-mcp'` | `'fmo-mcp'` |
+| `favro_help` timeout 15 000 ms | `fmo_help` timeout 10 000 ms |
+| `favro_run` timeout 60 000 ms | `fmo_run` timeout 90 000 ms |
+| help description mentions favro | adapted to describe fmo / FileMaker OData |
+| Jest `require.main` guard | identical (works in CommonJS) |
+| `require('../package.json')` version | identical path |
+
+Shebang, `execFileAsync`, args-array splitting, `isError` logic, stderr separator, IIFE guard — all identical.
+
+**Acceptance:**
+- [ ] `npm test` — all 6 new tests pass, 0 regressions in existing suite
+- [ ] `npm run lint` clean
+- [ ] TypeScript strict mode: no `noUnusedLocals` / `noImplicitAny` errors
+
+**Dependencies:** M2
+
+**Files:** `src/mcp-server.ts`
+
+**Scope:** S (~100 lines)
+
+---
+
+### M4: Build + acceptance check + commit
+
+**Description:** Compile, verify the binary, run the full acceptance checklist from the spec, then commit.
+
+**Steps:**
+1. `npm run build` → `dist/mcp-server.js` must exist and have the shebang
+2. Check `bin` entry resolves: `node dist/mcp-server.js --version` or a quick stdio smoke (optional)
+3. Tick every acceptance checkbox in `SPEC-MCP.md`
+4. `git commit`
+
+**Acceptance (from SPEC-MCP.md):**
+- [ ] `npm run build` compiles `dist/mcp-server.js` without errors
+- [ ] `fmodata-mcp` binary registered in `package.json`
+- [ ] `npm test` — all 6 tests pass, existing tests unaffected
+- [ ] `dist/mcp-server.js` starts with `#!/usr/bin/env node`
+
+**Dependencies:** M3
+
+**Files:** none (commit only)
+
+**Scope:** XS
+
+---
+
+## Checkpoint: Done
+
+- [ ] All acceptance criteria in `SPEC-MCP.md` checked
+- [ ] `npm test` green
+- [ ] `npm run build` green
+- [ ] Commit on `main`
