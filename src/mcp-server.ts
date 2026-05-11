@@ -68,9 +68,9 @@ export function createMcpServer(): {
       });
       return { content: [{ type: 'text', text: stdout || stderr || '(no output)' }] };
     } catch (err: unknown) {
-      return {
-        content: [{ type: 'text', text: err instanceof Error ? err.message : String(err) }],
-      };
+      const e = err as { message?: string; stdout?: string; stderr?: string };
+      const text = [e.message ?? String(err), e.stdout, e.stderr].filter(Boolean).join('\n');
+      return { content: [{ type: 'text', text }] };
     }
   }
 
@@ -103,10 +103,9 @@ export function createMcpServer(): {
       if (stderr) text += '\n--- stderr ---\n' + stderr;
       return { content: [{ type: 'text', text }] };
     } catch (err: unknown) {
-      return {
-        content: [{ type: 'text', text: err instanceof Error ? err.message : String(err) }],
-        isError: true,
-      };
+      const e = err as { message?: string; stdout?: string; stderr?: string };
+      const text = [e.message ?? String(err), e.stdout, e.stderr].filter(Boolean).join('\n');
+      return { content: [{ type: 'text', text }], isError: true };
     }
   }
 
