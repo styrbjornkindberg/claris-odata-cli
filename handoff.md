@@ -1,6 +1,6 @@
 # Handoff: claris-odata-cli OData Compliance & Hardening
 
-**Last updated:** 2026-05-06 (session 8)
+**Last updated:** 2026-05-11 (session 9)
 **Branch:** `feature/odata-conformance-sweep`
 **Repo:** `/Users/styrbjorn/Sites/claris-odata-cli`
 
@@ -25,14 +25,21 @@ binary download issue in this environment — ignore it, the right version is al
 | T8 | `edd1a2c` | `fmo batch --file <batch.json>` — JSON DSL → multipart/mixed POST to `/$batch` |
 | T9 | `a9a24da` | `fmo update --replace` — PUT via `ODataClient.replaceRecord`; `UpdateOptions.replace` flag |
 | T10 | `0cabbdb` | Cleanup sweep: `formatApiError` centralised in `src/cli/index.ts`; HealthCommand imports it directly; BaseCommand.formatError delegates; private duplicates removed from health/overview; filter simplified to `e.kind !== 'FunctionImport'`; all `Buffer.from` → `AuthManager.createBasicAuthToken` |
+| T11 | `165e35c` | Coverage sweep: `@vitest/coverage-v8` added; `profiles.test.ts` (22 tests, 0→100%); 429 NaN retry-after + empty-options branches in client tests; health latency threshold de-flaked; overall 83.15%, api/client.ts + api/prefer.ts 100% |
 
-**Current state:** 42 test files, 582 tests passing, 0 lint errors, build clean.
+**Current state:** 43 test files, 606 tests passing, 0 lint errors, build clean.
 
 ---
 
-## Start Here: T11
+## Start Here: T12
 
-**Goal:** Coverage — ≥ 80% overall, 100% on `api/client.ts` + `api/prefer.ts` (see Phase 5 below).
+**Goal:** Smoke-test notes — manual verification checklist against a real FileMaker Cloud instance (`list`, `get --count`, `script`, `upload`).
+
+---
+
+## T11 (done)
+
+**Goal:** Coverage — ≥ 80% overall, 100% on `api/client.ts` + `api/prefer.ts`. ✅
 
 ---
 
@@ -178,15 +185,17 @@ Phase 1: ✅ T1  ✅ T2  ✅ Checkpoint A
 Phase 2: ✅ T3  ✅ T4  ✅ T5  ✅ Checkpoint B
 Phase 3: ✅ T6  ✅ T7
 Phase 4: ✅ T8  ✅ T9  ✅ T10  ⬜ Checkpoint C
-Phase 5: ⬜ T11  ⬜ T12  ⬜ Checkpoint D
+Phase 5: ✅ T11  ⬜ T12  ⬜ Checkpoint D
 ```
 
 ## Repo State
 
 ```
 Branch:      feature/odata-conformance-sweep
-Last commit: 0cabbdb feat: T10 — cleanup sweep
-Tests:       42 files, 582 passing
+Last commit: 165e35c test: T11 — coverage sweep
+Tests:       43 files, 606 passing
+Coverage:    83.15% stmt/lines, 81.21% branch, 88.37% fn — all ≥ 80%
+             api/client.ts 100%, api/prefer.ts 100%, config/profiles.ts 100%
 Lint:        0 errors, 49 warnings (all pre-existing explicit-return-type in test files)
 Build:       clean
 ```
