@@ -22,6 +22,9 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
+
 # Credentials (NEVER commit these)
 credentials.json
 *.pem
