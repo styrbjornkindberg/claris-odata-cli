@@ -1,5 +1,14 @@
 # fmo in Live Artifacts
 
+> **DDL (schema operations) live in SKILL.md** — `fmo table create/delete`,
+> `fmo field add/delete`, `fmo index create/delete`. DDL is not used from
+> artifacts; see the `## Schema DDL` and `## DDL --fields format` sections
+> in SKILL.md for syntax and field type reference.
+
+---
+
+
+
 ## fmoJSONL helper
 
 Use this exact function — it matches how the MCP tool returns data.
