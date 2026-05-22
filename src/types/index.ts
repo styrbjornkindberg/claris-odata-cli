@@ -152,6 +152,51 @@ export interface ODataErrorDetail {
 }
 
 // ============================================================================
+// DDL Types
+// ============================================================================
+
+/**
+ * Definition of a single FileMaker field for DDL operations
+ */
+export interface FieldDefinition {
+  /** Field name */
+  name: string;
+  /**
+   * Field type. Examples: "int", "varchar(100)", "blob", "timestamp", "int[4]"
+   * Full list: numeric, decimal, int, date, time, timestamp,
+   * varchar(n), character varying(n), blob, varbinary, longvarbinary
+   */
+  type: string;
+  /** Make this field the primary key */
+  primary?: boolean;
+  /** Enforce uniqueness */
+  unique?: boolean;
+  /** Make this a global (stored) field */
+  global?: boolean;
+  /** Allow null values (default: true) */
+  nullable?: boolean;
+  /** Default value expression (e.g. "CURRENT_USER", "CURRENT_DATE") */
+  default?: string;
+  /** For blob/container fields: external secure storage path */
+  externalSecurePath?: string;
+}
+
+/**
+ * Request body for creating a table via FileMaker_Tables
+ */
+export interface CreateTableBody {
+  tableName: string;
+  fields: FieldDefinition[];
+}
+
+/**
+ * Request body for adding fields via FileMaker_Tables PATCH
+ */
+export interface AddFieldsBody {
+  fields: FieldDefinition[];
+}
+
+// ============================================================================
 // CLI Types
 // ============================================================================
 

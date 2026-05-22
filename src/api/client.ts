@@ -18,7 +18,13 @@ import {
   ValidationError,
 } from './errors';
 import { buildPreferHeader, type PreferOptions } from './prefer';
-import type { ODataCollection, QueryResult, QueryOptions, BatchRequest } from '../types';
+import type {
+  ODataCollection,
+  QueryResult,
+  QueryOptions,
+  BatchRequest,
+  FieldDefinition,
+} from '../types';
 
 /**
  * Configuration for the OData client
@@ -346,6 +352,57 @@ export class ODataClient {
       headers: { 'Content-Type': `multipart/mixed; boundary=${boundary}` },
     });
     return response.data;
+  }
+
+  /**
+   * Create a new table via the FileMaker_Tables system collection
+   */
+  async createTable(tableName: string, fields: FieldDefinition[]): Promise<unknown> {
+    const url = `/fmi/odata/v4/${this.database}/FileMaker_Tables`;
+    const response = await this.http.post<unknown>(url, { tableName, fields });
+    return response.data;
+  }
+
+  /**
+   * Delete a table and all its records via FileMaker_Tables
+   */
+  async deleteTable(tableName: string): Promise<void> {
+    const url = `/fmi/odata/v4/${this.database}/FileMaker_Tables/${tableName}`;
+    await this.http.delete(url);
+  }
+
+  /**
+   * Add fields to an existing table via FileMaker_Tables PATCH
+   */
+  async addFields(tableName: string, fields: FieldDefinition[]): Promise<unknown> {
+    const url = `/fmi/odata/v4/${this.database}/FileMaker_Tables/${tableName}`;
+    const response = await this.http.patch<unknown>(url, { fields });
+    return response.data;
+  }
+
+  /**
+   * Delete a field from a table via FileMaker_Tables
+   */
+  async deleteField(tableName: string, fieldName: string): Promise<void> {
+    const url = `/fmi/odata/v4/${this.database}/FileMaker_Tables/${tableName}/${fieldName}`;
+    await this.http.delete(url);
+  }
+
+  /**
+   * Create an index on a field via FileMaker_Indexes
+   */
+  async createIndex(tableName: string, fieldName: string): Promise<unknown> {
+    const url = `/fmi/odata/v4/${this.database}/FileMaker_Indexes/${tableName}`;
+    const response = await this.http.post<unknown>(url, { indexName: fieldName });
+    return response.data;
+  }
+
+  /**
+   * Delete a field index via FileMaker_Indexes
+   */
+  async deleteIndex(tableName: string, fieldName: string): Promise<void> {
+    const url = `/fmi/odata/v4/${this.database}/FileMaker_Indexes/${tableName}/${fieldName}`;
+    await this.http.delete(url);
   }
 
   /**
