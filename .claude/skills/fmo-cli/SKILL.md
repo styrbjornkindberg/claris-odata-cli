@@ -23,7 +23,7 @@ fmo overview -s <id> -d <db>                           # dashboard: servers, dbs
 fmo list servers
 fmo list databases -s <id>
 fmo list tables -s <id> -d <db>
-fmo schema <Table> -s <id> -d <db>                     # field names + types
+fmo schema [Table] -s <id> -d <db>                     # read field names from $metadata (no table = list all tables)
 fmo browse                                             # interactive TUI
 
 # Query
@@ -41,6 +41,14 @@ fmo upload <Table> <recordId> <field> <file> -s <id> -d <db>
 
 # Batch
 fmo batch -s <id> -d <db> --file <path>               # JSON DSL file of OData requests
+
+# Schema DDL (requires Full Access account)
+fmo table create <name> -s <id> -d <db> [--fields '<json>']
+fmo table delete <name> -s <id> -d <db> --confirm      # drops table AND all records
+fmo field add <table> -s <id> -d <db> --fields '<json>'
+fmo field delete <table> <field> -s <id> -d <db> --confirm
+fmo index create <table> <field> -s <id> -d <db>
+fmo index delete <table> <field> -s <id> -d <db> --confirm
 
 # Server management
 fmo server add --name <name> --host <host>             # register a server
@@ -84,6 +92,42 @@ get TidRad --filter AnvID eq 126 and Datum ge 2026-04-01 -s my-server -d MyDB
 **Never use `-f json`** when calling from artifacts or parsing output.
 JSONL outputs one object per line — partial reads still parse. JSON wraps
 everything in a single array that fails entirely if truncated.
+
+---
+
+## DDL `--fields` format
+
+Pass a JSON array of field definition objects. Quote the whole value:
+
+```bash
+fmo table create Contacts -s srv -d MyDB \
+  --fields '[{"name":"ID","type":"int","primary":true},{"name":"Name","type":"varchar(100)","nullable":false}]'
+
+fmo field add Contacts -s srv -d MyDB \
+  --fields '[{"name":"Phone","type":"varchar(25)"}]'
+```
+
+**Field definition properties:**
+
+| Property | Type | Notes |
+|---|---|---|
+| `name` | string | Required |
+| `type` | string | Required — see types below |
+| `primary` | bool | Primary key |
+| `unique` | bool | Unique constraint |
+| `global` | bool | Global (stored) field |
+| `nullable` | bool | Default true |
+| `default` | string | `CURRENT_USER`, `CURRENT_DATE`, `CURRENT_TIME`, `CURRENT_TIMESTAMP` |
+| `externalSecurePath` | string | Container field external storage path |
+
+**Field types:** `numeric`, `decimal`, `int`, `date`, `time`, `timestamp`,
+`varchar(n)`, `character varying(n)`, `blob`, `varbinary`, `longvarbinary`.
+Repetitions: `"int[4]"`.
+
+**`--confirm` is required** on `table delete`, `field delete`, and `index delete`.
+`fmo table delete` deletes the table **and all its records** — no undo.
+
+**Requires Full Access account.** A 403 means the database account lacks DDL privileges.
 
 ---
 
