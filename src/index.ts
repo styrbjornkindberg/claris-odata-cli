@@ -335,6 +335,158 @@ function createProgram(): Command {
       process.exit(await cmd.run());
     });
 
+  // Table DDL commands: fmo table create|delete
+  const tableCmd = program.command('table').description('Manage FileMaker table schema');
+
+  tableCmd
+    .command('create <name>')
+    .description('Create a new table')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .option('--fields <json>', 'Field definitions as a JSON array', '[]')
+    .action(async (name: string, options) => {
+      const { TableCommand } = await import('./cli/table');
+      const globalOpts = program.opts();
+      let fields: unknown[];
+      try {
+        fields = JSON.parse(options.fields) as unknown[];
+      } catch {
+        process.stderr.write('error: --fields must be a valid JSON array\n');
+        process.exit(1);
+        return;
+      }
+      const cmd = new TableCommand({
+        action: 'create',
+        tableName: name,
+        fields: fields as any,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  tableCmd
+    .command('delete <name>')
+    .description('Delete a table and all its records')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .option('--confirm', 'Required: confirm deletion of table and all its records')
+    .action(async (name: string, options) => {
+      const { TableCommand } = await import('./cli/table');
+      const globalOpts = program.opts();
+      const cmd = new TableCommand({
+        action: 'delete',
+        tableName: name,
+        confirm: options.confirm === true,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Field DDL commands: fmo field add|delete
+  const fieldCmd = program.command('field').description('Manage fields in a FileMaker table');
+
+  fieldCmd
+    .command('add <table>')
+    .description('Add fields to an existing table')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .requiredOption('--fields <json>', 'Field definitions as a JSON array')
+    .action(async (table: string, options) => {
+      const { FieldCommand } = await import('./cli/field');
+      const globalOpts = program.opts();
+      let fields: unknown[];
+      try {
+        fields = JSON.parse(options.fields) as unknown[];
+      } catch {
+        process.stderr.write('error: --fields must be a valid JSON array\n');
+        process.exit(1);
+        return;
+      }
+      const cmd = new FieldCommand({
+        action: 'add',
+        tableName: table,
+        fields: fields as any,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  fieldCmd
+    .command('delete <table> <field>')
+    .description('Delete a field from a table')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .option('--confirm', 'Required: confirm permanent field deletion')
+    .action(async (table: string, field: string, options) => {
+      const { FieldCommand } = await import('./cli/field');
+      const globalOpts = program.opts();
+      const cmd = new FieldCommand({
+        action: 'delete',
+        tableName: table,
+        fieldName: field,
+        confirm: options.confirm === true,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  // Index DDL commands: fmo index create|delete
+  const indexCmd = program.command('index').description('Manage field indexes in a FileMaker table');
+
+  indexCmd
+    .command('create <table> <field>')
+    .description('Create an index on a field')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .action(async (table: string, field: string, options) => {
+      const { IndexCommand } = await import('./cli/ddl-index');
+      const globalOpts = program.opts();
+      const cmd = new IndexCommand({
+        action: 'create',
+        tableName: table,
+        fieldName: field,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
+  indexCmd
+    .command('delete <table> <field>')
+    .description('Delete a field index')
+    .option('-s, --server <id>', 'Server ID')
+    .option('-d, --database <name>', 'Database name')
+    .option('--confirm', 'Required: confirm index deletion')
+    .action(async (table: string, field: string, options) => {
+      const { IndexCommand } = await import('./cli/ddl-index');
+      const globalOpts = program.opts();
+      const cmd = new IndexCommand({
+        action: 'delete',
+        tableName: table,
+        fieldName: field,
+        confirm: options.confirm === true,
+        serverId: options.server ?? globalOpts.server,
+        database: options.database ?? globalOpts.database,
+        output: globalOpts.format as OutputFormat,
+        verbose: globalOpts.verbose ?? false,
+      });
+      process.exit(await cmd.run());
+    });
+
   // Browse command
   program
     .command('browse')
