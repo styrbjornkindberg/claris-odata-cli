@@ -51,6 +51,33 @@ const ACCEPT_RECORDS = 'application/json;odata.metadata=minimal;IEEE754Compatibl
 const DEFAULT_TIMEOUT_MS = 30000;
 
 /**
+ * Double every percent-escape in the PATH portion of a relative URL (`%` → `%25`),
+ * leaving the query string ( everything from `?` onward ) untouched.
+ *
+ * Used as a one-shot retry when a reverse proxy in front of FileMaker (e.g. nginx)
+ * percent-decodes the request *path* once before forwarding — but passes the query
+ * string through verbatim. Doubling only the path escapes means the proxy's single
+ * decode restores the intended single-encoded path for FileMaker, while a single-
+ * encoded query (which the proxy never touches) is left intact. Structural characters
+ * (`/ ? = & $`) carry no `%`, so they are unaffected.
+ */
+function doubleEncodePath(url: string): string {
+  const q = url.indexOf('?');
+  if (q === -1) return url.replace(/%/g, '%25');
+  return url.slice(0, q).replace(/%/g, '%25') + url.slice(q);
+}
+
+/**
+ * True when an error looks like a proxy single-decode mangling the path — the
+ * FileMaker OData server reports "syntax error in URL" when it receives raw
+ * non-ASCII bytes in an entity/field name. Used to gate the double-encode retry.
+ */
+function isProxyUrlDecodeError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /syntax error in URL/i.test(message);
+}
+
+/**
  * FileMaker OData API client
  *
  * Handles all HTTP communication with the FileMaker OData API.
@@ -99,7 +126,7 @@ export class ODataClient {
     }
 
     if (options.select?.length) {
-      params.push(`$select=${options.select.join(',')}`);
+      params.push(`$select=${options.select.map(encodeURIComponent).join(',')}`);
     }
 
     if (options.skip !== undefined) {
@@ -202,12 +229,23 @@ export class ODataClient {
     prefer?: PreferOptions
   ): Promise<QueryResult<T>> {
     const query = this.buildQueryString(options);
-    const url = `/fmi/odata/v4/${this.database}/${tableName}${query}`;
+    const path = `/fmi/odata/v4/${encodeURIComponent(this.database)}/${encodeURIComponent(tableName)}${query}`;
     const preferHeaders = buildPreferHeader({ ...this.defaultPrefer, ...prefer });
+    const headers = { Accept: ACCEPT_RECORDS, ...preferHeaders };
 
-    const response = await this.http.get<ODataCollection<T>>(url, {
-      headers: { Accept: ACCEPT_RECORDS, ...preferHeaders },
-    });
+    let response;
+    try {
+      response = await this.http.get<ODataCollection<T>>(path, { headers });
+    } catch (error) {
+      // A reverse proxy in front of FileMaker (e.g. nginx) may percent-decode the
+      // request path once before forwarding. A correctly single-encoded non-ASCII
+      // name ("Företag" → "F%C3%B6retag") is decoded back to raw bytes, which the
+      // FileMaker OData parser rejects ("syntax error in URL"). Retry once with the
+      // escapes doubled so the proxy's single decode restores the single-encoded URL.
+      // No-op on direct servers — they never emit this error.
+      if (!isProxyUrlDecodeError(error)) throw error;
+      response = await this.http.get<ODataCollection<T>>(doubleEncodePath(path), { headers });
+    }
     return {
       records: response.data.value,
       count: response.data['@odata.count'],
