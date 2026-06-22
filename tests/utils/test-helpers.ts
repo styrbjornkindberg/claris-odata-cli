@@ -8,6 +8,20 @@
  */
 
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
+/**
+ * Redirect ALL config-file I/O to a throwaway temp dir for the whole test run.
+ *
+ * The server store (src/config/servers.ts) persists to a real on-disk file and
+ * is resolved lazily from CLARIS_ODATA_CONFIG_DIR. Setting it here — at setup-file
+ * module load, before any test executes — guarantees no test can read or clobber
+ * the user's real ~/.config/claris-odata-cli/servers.json.
+ */
+const TEST_CONFIG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'claris-odata-cli-test-'));
+process.env.CLARIS_ODATA_CONFIG_DIR = TEST_CONFIG_DIR;
 
 /**
  * Test timeout constants
@@ -137,7 +151,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // Global teardown runs once after all tests
-  // Cleanup any global resources here
+  // Remove the throwaway config dir created at module load.
+  try {
+    fs.rmSync(TEST_CONFIG_DIR, { recursive: true, force: true });
+  } catch {
+    // best-effort cleanup; ignore
+  }
 });
 
 beforeEach(() => {

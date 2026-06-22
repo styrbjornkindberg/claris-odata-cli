@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { buildServerId, ServerManager, serverStore } from '../../src/config/servers';
 
 describe('buildServerId', () => {
@@ -143,5 +146,27 @@ describe('ServerManager', () => {
       const removed = manager.removeServer('unknown-id');
       expect(removed).toBe(false);
     });
+  });
+});
+
+describe('config-dir isolation (regression: tests must not touch real config)', () => {
+  it('honors CLARIS_ODATA_CONFIG_DIR so the store lives outside ~/.config', () => {
+    const dir = process.env.CLARIS_ODATA_CONFIG_DIR;
+    // Global test setup (tests/utils/test-helpers.ts) redirects to a temp dir.
+    expect(dir, 'global setup must redirect config to a temp dir').toBeTruthy();
+    expect(dir).not.toBe(path.join(os.homedir(), '.config', 'claris-odata-cli'));
+
+    const manager = new ServerManager();
+    const server = manager.addServer({ name: 'Isolation Probe', host: 'probe.local' });
+
+    // The write landed in the temp dir, not the real user config.
+    const written = path.join(dir as string, 'servers.json');
+    expect(fs.existsSync(written)).toBe(true);
+    expect(fs.readFileSync(written, 'utf8')).toContain(server.id);
+
+    const realFile = path.join(os.homedir(), '.config', 'claris-odata-cli', 'servers.json');
+    expect(written).not.toBe(realFile);
+
+    manager.removeServer(server.id);
   });
 });

@@ -26,12 +26,29 @@ export function buildServerId(name: string, host: string): string {
   return `${slug}-${suffix}`;
 }
 
-const CONFIG_DIR = path.join(os.homedir(), '.config', 'claris-odata-cli');
-const SERVERS_FILE = path.join(CONFIG_DIR, 'servers.json');
+/**
+ * Resolve the config directory holding servers.json.
+ *
+ * Honors `CLARIS_ODATA_CONFIG_DIR` (used by the test suite and sandboxes to
+ * redirect writes away from the real user config), then `XDG_CONFIG_HOME`, then
+ * `~/.config`. Resolved lazily on every call so an env change mid-process takes
+ * effect — this is what keeps tests from clobbering a real `servers.json`.
+ */
+function configDir(): string {
+  const override = process.env.CLARIS_ODATA_CONFIG_DIR;
+  if (override && override.trim()) return override;
+  const xdg = process.env.XDG_CONFIG_HOME;
+  const base = xdg && xdg.trim() ? xdg : path.join(os.homedir(), '.config');
+  return path.join(base, 'claris-odata-cli');
+}
+
+function serversFile(): string {
+  return path.join(configDir(), 'servers.json');
+}
 
 function readServers(): Record<string, Server> {
   try {
-    const raw = fs.readFileSync(SERVERS_FILE, 'utf8');
+    const raw = fs.readFileSync(serversFile(), 'utf8');
     return JSON.parse(raw) as Record<string, Server>;
   } catch {
     return {};
@@ -39,8 +56,8 @@ function readServers(): Record<string, Server> {
 }
 
 function writeServers(servers: Record<string, Server>): void {
-  fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  fs.writeFileSync(SERVERS_FILE, JSON.stringify(servers, null, 2), 'utf8');
+  fs.mkdirSync(configDir(), { recursive: true });
+  fs.writeFileSync(serversFile(), JSON.stringify(servers, null, 2), 'utf8');
 }
 
 /**
