@@ -52,6 +52,17 @@ function createProgram(): Command {
       'Request timeout in seconds (0 = no timeout). Overrides FMO_TIMEOUT.'
     );
 
+  // Surface global options (incl. --timeout) in every subcommand's --help,
+  // not just the top-level help. Commander hides parent options by default.
+  program.configureHelp({ showGlobalOptions: true });
+
+  program.addHelpText(
+    'after',
+    '\nEnvironment:\n' +
+      '  FMO_TIMEOUT  Request timeout in seconds (0 = no timeout). The --timeout\n' +
+      '               flag takes precedence when both are set.'
+  );
+
   // Propagate --timeout to the OData client (read via FMO_TIMEOUT in client.ts)
   // before any command action runs. Avoids threading timeout through every
   // command's client construction.
