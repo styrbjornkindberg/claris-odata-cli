@@ -5,7 +5,7 @@
  * real CLI binary is invoked — these tests are fast and offline.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { execFile } from 'child_process';
 
 vi.mock('child_process', () => ({
@@ -13,7 +13,12 @@ vi.mock('child_process', () => ({
 }));
 
 // Import after mock declaration so promisify picks up the mock
-import { createMcpServer, parseCommandString, ToolResult } from '../../src/mcp-server';
+import {
+  createMcpServer,
+  parseCommandString,
+  resolveRunTimeoutMs,
+  ToolResult,
+} from '../../src/mcp-server';
 
 const mockExecFile = vi.mocked(execFile);
 
@@ -41,6 +46,39 @@ beforeEach(() => {
 });
 
 // ─── parseCommandString ───────────────────────────────────────────────────────
+
+describe('resolveRunTimeoutMs()', () => {
+  let prev: string | undefined;
+
+  beforeEach(() => {
+    prev = process.env.FMO_TIMEOUT;
+    delete process.env.FMO_TIMEOUT;
+  });
+
+  afterEach(() => {
+    if (prev === undefined) delete process.env.FMO_TIMEOUT;
+    else process.env.FMO_TIMEOUT = prev;
+  });
+
+  it('defaults to 150s when FMO_TIMEOUT is unset', () => {
+    expect(resolveRunTimeoutMs()).toBe(150_000);
+  });
+
+  it('adds a buffer above the inner CLI timeout', () => {
+    process.env.FMO_TIMEOUT = '300';
+    expect(resolveRunTimeoutMs()).toBe(300_000 + 30_000);
+  });
+
+  it('returns 0 (no timeout) when FMO_TIMEOUT is 0', () => {
+    process.env.FMO_TIMEOUT = '0';
+    expect(resolveRunTimeoutMs()).toBe(0);
+  });
+
+  it('falls back to default on invalid values', () => {
+    process.env.FMO_TIMEOUT = 'abc';
+    expect(resolveRunTimeoutMs()).toBe(150_000);
+  });
+});
 
 describe('parseCommandString()', () => {
   it('splits plain whitespace-separated tokens', () => {

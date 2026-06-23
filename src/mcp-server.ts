@@ -46,6 +46,32 @@ export function parseCommandString(command: string): string[] {
   return shellParse(command).filter((t): t is string => typeof t === 'string');
 }
 
+/** Default fmo_run process timeout (ms) when FMO_TIMEOUT is unset. */
+const DEFAULT_RUN_TIMEOUT_MS = 150_000;
+
+/**
+ * Buffer (ms) added on top of the inner CLI request timeout so the spawned
+ * process is never killed before its own HTTP request can time out and report
+ * a clean error. Covers node startup + stdout flush.
+ */
+const RUN_TIMEOUT_BUFFER_MS = 30_000;
+
+/**
+ * Resolve the fmo_run child-process timeout from `FMO_TIMEOUT` (seconds).
+ *
+ * The child CLI inherits FMO_TIMEOUT and applies it to its own axios request,
+ * so the outer process timeout must sit *above* the inner one (plus a buffer)
+ * to let the inner request fail cleanly. `FMO_TIMEOUT=0` disables both.
+ */
+export function resolveRunTimeoutMs(): number {
+  const raw = process.env.FMO_TIMEOUT;
+  if (raw === undefined || raw.trim() === '') return DEFAULT_RUN_TIMEOUT_MS;
+  const seconds = Number(raw);
+  if (!Number.isFinite(seconds) || seconds < 0) return DEFAULT_RUN_TIMEOUT_MS;
+  if (seconds === 0) return 0; // no timeout
+  return seconds * 1000 + RUN_TIMEOUT_BUFFER_MS;
+}
+
 /**
  * Factory that creates and configures the McpServer instance.
  * Exported separately so tests can call it without connecting a transport.
@@ -97,7 +123,7 @@ export function createMcpServer(): {
     const execArgs = parseCommandString(args.command.trim());
     try {
       const { stdout, stderr } = await execFileAsync('node', [fmoBin, ...execArgs], {
-        timeout: 90_000,
+        timeout: resolveRunTimeoutMs(),
       });
       let text = stdout || '(no output)';
       if (stderr) text += '\n--- stderr ---\n' + stderr;
