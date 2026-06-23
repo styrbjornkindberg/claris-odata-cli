@@ -46,9 +46,28 @@ export interface ClientConfig {
 const ACCEPT_RECORDS = 'application/json;odata.metadata=minimal;IEEE754Compatible=true';
 
 /**
- * Default request timeout (30 seconds)
+ * Default request timeout (120 seconds).
+ *
+ * FileMaker OData calls that run server-side scripts or large/unindexed queries
+ * can legitimately take longer than the old 30s ceiling, surfacing as
+ * `ECONNABORTED`. 120s is generous for interactive use without hanging forever
+ * on a dead connection. Override per-call via `ClientConfig.timeout`, or globally
+ * via the `FMO_TIMEOUT` env var (seconds; `0` disables the timeout entirely).
  */
-const DEFAULT_TIMEOUT_MS = 30000;
+const DEFAULT_TIMEOUT_MS = 120000;
+
+/**
+ * Resolve the timeout (ms) from the `FMO_TIMEOUT` env var (in seconds).
+ * Returns undefined when unset or invalid so the caller falls back to the
+ * built-in default. A value of `0` means "no timeout" (axios convention).
+ */
+function envTimeoutMs(): number | undefined {
+  const raw = process.env.FMO_TIMEOUT;
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const seconds = Number(raw);
+  if (!Number.isFinite(seconds) || seconds < 0) return undefined;
+  return seconds * 1000;
+}
 
 /**
  * Double every percent-escape in the PATH portion of a relative URL (`%` → `%25`),
@@ -93,7 +112,7 @@ export class ODataClient {
 
     this.http = axios.create({
       baseURL: config.baseUrl,
-      timeout: config.timeout ?? DEFAULT_TIMEOUT_MS,
+      timeout: config.timeout ?? envTimeoutMs() ?? DEFAULT_TIMEOUT_MS,
       headers: {
         Authorization: config.authToken,
         'Content-Type': 'application/json',

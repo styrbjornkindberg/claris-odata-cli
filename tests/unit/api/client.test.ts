@@ -56,7 +56,7 @@ describe('ODataClient', () => {
       expect(axios.create).toHaveBeenCalledWith(
         expect.objectContaining({
           baseURL: 'https://fm.example.com',
-          timeout: 30000,
+          timeout: 120000,
           headers: expect.objectContaining({
             Authorization: 'Basic dGVzdDp0ZXN0',
             'Content-Type': 'application/json',
@@ -72,6 +72,48 @@ describe('ODataClient', () => {
       expect(axios.create).toHaveBeenCalledWith(
         expect.objectContaining({ timeout: 5000 })
       );
+    });
+
+    it('reads timeout from FMO_TIMEOUT env var (seconds)', () => {
+      const prev = process.env.FMO_TIMEOUT;
+      process.env.FMO_TIMEOUT = '300';
+      try {
+        createClient();
+        expect(axios.create).toHaveBeenCalledWith(
+          expect.objectContaining({ timeout: 300000 })
+        );
+      } finally {
+        if (prev === undefined) delete process.env.FMO_TIMEOUT;
+        else process.env.FMO_TIMEOUT = prev;
+      }
+    });
+
+    it('config timeout overrides FMO_TIMEOUT env var', () => {
+      const prev = process.env.FMO_TIMEOUT;
+      process.env.FMO_TIMEOUT = '300';
+      try {
+        createClient({ timeout: 5000 });
+        expect(axios.create).toHaveBeenCalledWith(
+          expect.objectContaining({ timeout: 5000 })
+        );
+      } finally {
+        if (prev === undefined) delete process.env.FMO_TIMEOUT;
+        else process.env.FMO_TIMEOUT = prev;
+      }
+    });
+
+    it('FMO_TIMEOUT of 0 disables the timeout', () => {
+      const prev = process.env.FMO_TIMEOUT;
+      process.env.FMO_TIMEOUT = '0';
+      try {
+        createClient();
+        expect(axios.create).toHaveBeenCalledWith(
+          expect.objectContaining({ timeout: 0 })
+        );
+      } finally {
+        if (prev === undefined) delete process.env.FMO_TIMEOUT;
+        else process.env.FMO_TIMEOUT = prev;
+      }
     });
 
     it('registers response interceptor', () => {

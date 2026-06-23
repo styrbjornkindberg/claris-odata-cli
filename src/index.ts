@@ -46,7 +46,21 @@ function createProgram(): Command {
     .option('-v, --verbose', 'Enable verbose logging')
     .option('-f, --format <format>', 'Output format (json, jsonl, table, csv)', 'table')
     .option('-s, --server <id>', 'Default server ID')
-    .option('-d, --database <name>', 'Default database name');
+    .option('-d, --database <name>', 'Default database name')
+    .option(
+      '--timeout <seconds>',
+      'Request timeout in seconds (0 = no timeout). Overrides FMO_TIMEOUT.'
+    );
+
+  // Propagate --timeout to the OData client (read via FMO_TIMEOUT in client.ts)
+  // before any command action runs. Avoids threading timeout through every
+  // command's client construction.
+  program.hook('preAction', () => {
+    const { timeout } = program.opts();
+    if (timeout !== undefined) {
+      process.env.FMO_TIMEOUT = String(timeout);
+    }
+  });
 
   // Init command
   program
